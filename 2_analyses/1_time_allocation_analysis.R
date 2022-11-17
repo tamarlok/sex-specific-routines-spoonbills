@@ -2,92 +2,64 @@ source("functions.R") # to have the most updated version of the functions
 Sys.setenv(TZ='Europe/Amsterdam')
 gps.breeding.data.behav <- gps.breeding.data.behav.sel
 
-table(gps.breeding.data.behav$habitat_salinity, gps.breeding.data.behav$habitat, gps.breeding.data.behav$behaviour)
-table(gps.breeding.data.behav$nest1, gps.breeding.data.behav$year, gps.breeding.data.behav$birdID)
+### Investigate patterns of total time spent foraging and attending the nest per day:
+gps.breeding.data.behav$at_nest <- 0
+gps.breeding.data.behav$at_nest[gps.breeding.data.behav$behaviour2=='at_nest'] <- 1
+gps.breeding.data.behav$foraging <- 0
+gps.breeding.data.behav$foraging[gps.breeding.data.behav$behaviour2=='foraging_freshwater'|gps.breeding.data.behav$behaviour2=='foraging_brackish'|gps.breeding.data.behav$behaviour2=='foraging_marine'] <- 1 # foraging on land is not considered as foraging
+gps.breeding.data.behav$foraging_marine <- 0
+gps.breeding.data.behav$foraging_marine[gps.breeding.data.behav$behaviour2=='foraging_brackish'|gps.breeding.data.behav$behaviour2=='foraging_marine'] <- 1
 
-# assign nest locations to attempts: 
-nest.locations.bird.year <- aggregate(cbind(nest1,nest2)~year+birdID+attempt+lat.nest1+lon.nest1+lat.nest2+lon.nest2+nest1.real+nest2.real,gps.breeding.data.behav,sum)
-nest.locations.bird.year = nest.locations.bird.year[order(nest.locations.bird.year$year, nest.locations.bird.year$birdID, nest.locations.bird.year$attempt),]
-# when nest1>nest2 (always being a real nesting attempt)
-nest.locations.bird.year[nest.locations.bird.year$nest1>nest.locations.bird.year$nest2,c('lat.nest','lon.nest')] <- nest.locations.bird.year[nest.locations.bird.year$nest1>nest.locations.bird.year$nest2,c('lat.nest1','lon.nest1')]
-# when nest2>nest1 and nest2 was a real nesting attempt: 
-nest.locations.bird.year[nest.locations.bird.year$nest2>nest.locations.bird.year$nest1 & nest.locations.bird.year$nest2.real==1,c('lat.nest','lon.nest')] <- nest.locations.bird.year[nest.locations.bird.year$nest2>nest.locations.bird.year$nest1 & nest.locations.bird.year$nest2.real==1,c('lat.nest2','lon.nest2')]
-# add lat.nest and lon.nest to gps.breeding.data.behav
-gps.breeding.data.behav <- merge(gps.breeding.data.behav, nest.locations.bird.year[,c('birdID','year','attempt','lat.nest','lon.nest')])
-# calculate distance to nest:
-gps.breeding.data.behav$distance.to.nest <- NA
-gps.breeding.data.behav$distance.to.nest[is.na(gps.breeding.data.behav$lat.nest)==F] <- round(distCosine(gps.breeding.data.behav[is.na(gps.breeding.data.behav$lat.nest)==F,c('longitude','latitude')], gps.breeding.data.behav[is.na(gps.breeding.data.behav$lat.nest)==F,c('lon.nest','lat.nest')], r=6378137),3) # gives the distance in meters between nest location and actual position of the bird; can only be calculated when lat.nest (and lon.nest) is known.
+gps.breeding.data.behav$duration_foraging <- gps.breeding.data.behav$foraging * gps.breeding.data.behav$duration_behav
+gps.breeding.data.behav$duration_foraging_marine <- gps.breeding.data.behav$foraging_marine * gps.breeding.data.behav$duration_behav
+gps.breeding.data.behav$duration_nest_attendance <- gps.breeding.data.behav$at_nest * gps.breeding.data.behav$duration_behav
 
-# remove the data where the habitat is unknown:
-gps.breeding.data.behav$behaviour2 = gps.breeding.data.behav$behaviour
-gps.breeding.data.behav$behaviour2[gps.breeding.data.behav$behaviour=='foraging'] = paste(gps.breeding.data.behav$behaviour[gps.breeding.data.behav$behaviour=='foraging'], gps.breeding.data.behav$habitat_salinity[gps.breeding.data.behav$behaviour=='foraging'], sep='_')
-gps.breeding.data.behav$behaviour2[gps.breeding.data.behav$behaviour=='resting'] = paste(gps.breeding.data.behav$behaviour[gps.breeding.data.behav$behaviour=='resting'], gps.breeding.data.behav$habitat_type[gps.breeding.data.behav$behaviour=='resting'], sep='_')
-gps.breeding.data.behav$behaviour2[gps.breeding.data.behav$distance.to.nest<5] = 'at_nest'
-# TL 2022.05.26: eerder stond hier als nest1==1|nest2==1, die waren in determine.breeding.phases berekend als <5 meter van nest1 of nest2 af. Dit zou hetzelfde moeten geven als distance.to.nest<5, maar dat is blijkbaar niet zo, want ineens is het percentage nest attendance veel lager. zijn de nest coordinaten dan toch verkeerd toegekend? Ik ben nu de determine.breeding.phases functie opnieuw aan het runnen waarbij ik de kolommen nest1 en nest2 behoud, om te kijken wat hier fout gaat. 
-#gps.breeding.data.behav$behaviour2[gps.breeding.data.behav$nest1==1|gps.breeding.data.behav$nest2==1] = 'at_nest'
+# duration per bird per date (only calculated for exploration plots)
+duration_behaviour_yday_bird_phase = aggregate(cbind(duration_behav/60,duration_nest_attendance/60,duration_foraging/60,duration_foraging_marine/60)~year+birdID+yday_CEST+day_rel_hatching+week_rel_hatching+sex+breeding.phase, gps.breeding.data.behav, sum)
+names(duration_behaviour_yday_bird_phase)[8:11] = c("dur_tot_yday","dur_at_nest_yday","dur_foraging_yday","dur_foraging_marine_yday")
+duration_behaviour_yday_bird_phase = duration_behaviour_yday_bird_phase[order(duration_behaviour_yday_bird_phase$year, duration_behaviour_yday_bird_phase$birdID, duration_behaviour_yday_bird_phase$yday_CEST),]
+head(duration_behaviour_yday_bird_phase)
+duration_behaviour_yday_bird_phase$prop_for <- duration_behaviour_yday_bird_phase$dur_foraging_yday/duration_behaviour_yday_bird_phase$dur_tot_yday
+# duration per bird per breeding phase (used for Fig 3 and for statistics)
+duration_behaviour_bird_phase_year = aggregate(cbind(duration_behav/60,duration_nest_attendance/60,duration_foraging/60,duration_foraging_marine/60)~year+birdID+sex+breeding.phase, gps.breeding.data.behav, sum)
+names(duration_behaviour_bird_phase_year)[5:8] = c("dur_tot","dur_at_nest","dur_foraging","dur_foraging_marine")
+duration_behaviour_bird_phase_year = duration_behaviour_bird_phase_year[order(duration_behaviour_bird_phase_year$year, duration_behaviour_bird_phase_year$birdID),]
+duration_behaviour_bird_phase_year$prop_nest <- duration_behaviour_bird_phase_year$dur_at_nest/duration_behaviour_bird_phase_year$dur_tot
+duration_behaviour_bird_phase_year$prop_for <- duration_behaviour_bird_phase_year$dur_foraging/duration_behaviour_bird_phase_year$dur_tot
+duration_behaviour_bird_phase_year$prop_for_marine <- duration_behaviour_bird_phase_year$dur_foraging_marine/duration_behaviour_bird_phase_year$dur_foraging
 
-gps.breeding.data.behav$behaviour2.nr <- NA
-gps.breeding.data.behav$behaviour2.nr[gps.breeding.data.behav$behaviour2=='foraging_marine'] = 9
-gps.breeding.data.behav$behaviour2.nr[gps.breeding.data.behav$behaviour2=='foraging_brackish'] = 8
-gps.breeding.data.behav$behaviour2.nr[gps.breeding.data.behav$behaviour2=='foraging_freshwater'] = 7
-gps.breeding.data.behav$behaviour2.nr[gps.breeding.data.behav$behaviour2=='flying'] = 6
-gps.breeding.data.behav$behaviour2.nr[gps.breeding.data.behav$behaviour2=='walking'] = 5
-gps.breeding.data.behav$behaviour2.nr[gps.breeding.data.behav$behaviour2=='resting_wadden'] = 4
-gps.breeding.data.behav$behaviour2.nr[gps.breeding.data.behav$behaviour2=='resting_mainland'] = 3
-gps.breeding.data.behav$behaviour2.nr[gps.breeding.data.behav$behaviour2=='resting_schier'] = 2
-gps.breeding.data.behav$behaviour2.nr[gps.breeding.data.behav$behaviour2=='at_nest'] = 1
-
-gps.breeding.data.behav$breeding.phase2 <- as.character(gps.breeding.data.behav$breeding.phase)
-gps.breeding.data.behav$breeding.phase2[gps.breeding.data.behav$breeding.phase.nr==5|gps.breeding.data.behav$breeding.phase.nr==6] <- "5.post-breeding"
-
-# for now, remove the foraging_NA and resting_NA cases for behaviour2, but we can probably include them by using smart criteria based on longitude and latitude.
-table(gps.breeding.data.behav$behaviour2)
-gps.breeding.data.behav <- gps.breeding.data.behav[gps.breeding.data.behav$behaviour!="unknown"&gps.breeding.data.behav$behaviour2!="foraging_NA"&gps.breeding.data.behav$behaviour2!="resting_NA"&gps.breeding.data.behav$behaviour2!="resting_rest",]
-# similar, we should also use some criteria to define foraging_land better
-gps.breeding.data.behav$behaviour2[gps.breeding.data.behav$behaviour2=="foraging_land"&gps.breeding.data.behav$habitat_type=="schier"] <- "foraging_brackish" # this is not necessarily true!
-gps.breeding.data.behav$behaviour2[gps.breeding.data.behav$behaviour2=="foraging_land"&gps.breeding.data.behav$habitat_type=="mainland"] <- "foraging_freshwater"
-# remove the 5 points with habitat_type=rest
-gps.breeding.data.behav <- gps.breeding.data.behav[gps.breeding.data.behav$habitat_type!="rest",]
-
-### Investigate patterns of total time spent foraging per day: 
-foraging_duration_yday_bird_phase = aggregate(duration/60~year+birdID+yday_CEST+day_rel_hatching+week_rel_hatching, gps.breeding.data.behav[gps.breeding.data.behav$behaviour=='foraging',], sum)
-names(foraging_duration_yday_bird_phase)[6] = 'dur_foraging_yday' # change column duration in to "dur_foraging_yday"
-duration_yday_birdID_year <- duration_yday_birdID_year[duration_yday_birdID_year$breeding.phase!='1.exclude',]
-duration_yday_birdID_year$breeding.phase <- factor(duration_yday_birdID_year$breeding.phase)
-foraging_duration_yday_bird_phase = merge(duration_yday_birdID_year, foraging_duration_yday_bird_phase, all.x=T) # to make sure that all the days for each bird are in the data, also the days without foraging (the famous zero's)
-foraging_duration_yday_bird_phase$dur_foraging_yday[is.na(foraging_duration_yday_bird_phase$dur_foraging_yday)] = 0 # change the NA's into zeros.
-foraging_duration_yday_bird_phase = foraging_duration_yday_bird_phase[order(foraging_duration_yday_bird_phase$year, foraging_duration_yday_bird_phase$birdID, foraging_duration_yday_bird_phase$yday_CEST),]
-
-### Remove data for which hatching dates were unknown:
-foraging_duration_yday_bird_phase <- foraging_duration_yday_bird_phase[is.na(foraging_duration_yday_bird_phase$day_rel_hatching)==F,]
-for_dur_week_bird_year = aggregate(dur_foraging_yday~year+birdID+sex+week, foraging_duration_yday_bird_phase, mean)
-for_dur_week_bird_year$sex.nr = ifelse(for_dur_week_bird_year$sex=='F',2,1)
-for_dur_week_rel_hatching_bird_year = aggregate(dur_foraging_yday~year+birdID+sex+week_rel_hatching, foraging_duration_yday_bird_phase, mean)
-for_dur_week_rel_hatching_bird_year$sex.nr = ifelse(for_dur_week_rel_hatching_bird_year$sex=='F',2,1)
-
-# Now translate to proportion of time spent foraging
-foraging_duration_yday_bird_phase$prop_for = foraging_duration_yday_bird_phase$dur_foraging_yday/foraging_duration_yday_bird_phase$dur_per_yday
-foraging_duration_yday_bird_phase$logit_prop_for = qlogis(foraging_duration_yday_bird_phase$prop_for+min(foraging_duration_yday_bird_phase$prop_for[foraging_duration_yday_bird_phase$prop_for>0]))
-# calculate average time spent foraging per bird per breeding phase (this should probably be the unit of the statistical analysis)
-foraging_duration_phase_year_bird <- aggregate(prop_for~breeding.phase+year+birdID+sex, foraging_duration_yday_bird_phase, mean)
-
-### determine the proportion foraging in brackish and marine (versus freshwater) habitat
-# calculate total foraging duration in brackish or marine habitat per bird per yday
-for_dur_bird_yday_marine = aggregate(duration/60~year+birdID+sex+week+yday_CEST, gps.breeding.data.behav[gps.breeding.data.behav$behaviour=='foraging'&gps.breeding.data.behav$habitat_salinity!="freshwater",], sum)
-# merge with file of all days that birds were foraging at least some time of the day:
-names(for_dur_bird_yday_marine)[6]="dur_for_brackish_marine"
-for_dur_bird_yday_marine_vs_total <- merge(foraging_duration_yday_bird_phase, for_dur_bird_yday_marine, all.x=T)
-for_dur_bird_yday_marine_vs_total$dur_for_brackish_marine[is.na(for_dur_bird_yday_marine_vs_total$dur_for_brackish_marine)] = 0 # where there is no foraging in brackish/marine but there is foraging in the day, duration should be 0.
-for_dur_bird_yday_marine_vs_total$prop_for_marine <- for_dur_bird_yday_marine_vs_total$dur_for_brackish_marine/for_dur_bird_yday_marine_vs_total$dur_foraging_yday
-
-# calculate means per bird per breeding phase per year
-for_prop_marine_bird_year_phase <- aggregate(prop_for_marine~breeding.phase+year+birdID+sex, for_dur_bird_yday_marine_vs_total, mean)
-for_prop_marine_bird_year_phase[order(for_prop_marine_bird_year_phase$sex, for_prop_marine_bird_year_phase$birdID, for_prop_marine_bird_year_phase$breeding.phase),]
-
-# Statistical analysis of Proportion of time spent foraging
+# Statistical analysis
 # Discussion on whether (or not) to use p-values with mixed-effects models (https://stats.stackexchange.com/questions/22988/how-to-obtain-the-p-value-check-significance-of-an-effect-in-a-lme4-mixed-mode)
-foraging_duration_phase_year_bird$logit_prop_for <- qlogis(foraging_duration_phase_year_bird$prop_for)
-m_for.dur.phasexsex = lme(logit_prop_for~breeding.phase*sex, data=foraging_duration_phase_year_bird, random=~1|year/birdID, method="ML") 
+# I decided to go for model selection approach, as the use of p-values in mixed-effects models is arbritary, and AIC provides more useful information on the level of support for certain effects (instead of just a boundary value for whether to reject a null hypothesis.
+
+# (1) PROPORTION OF TIME SPENT ATTENDING THE NEST (only comparing egg incubation and chick rearing phase)
+duration_behaviour_bird_phase_year_egg_chicks <- duration_behaviour_bird_phase_year[duration_behaviour_bird_phase_year$breeding.phase%in%c('3.eggs','4.chicks'),]
+min_prop_nest <- min(duration_behaviour_bird_phase_year_egg_chicks$prop_nest[duration_behaviour_bird_phase_year_egg_chicks$prop_nest>0])
+duration_behaviour_bird_phase_year_egg_chicks$prop_nest[duration_behaviour_bird_phase_year_egg_chicks$prop_nest==0] = min_prop_nest
+duration_behaviour_bird_phase_year_egg_chicks$logit_prop_nest <- qlogis(duration_behaviour_bird_phase_year_egg_chicks$prop_nest)
+m_prop_nest.phasexsex = lme(logit_prop_nest~breeding.phase*sex, data=duration_behaviour_bird_phase_year_egg_chicks, random=~1|year/birdID, method="ML") 
+model.sel.prop.at.nest <- dredge(m_prop_nest.phasexsex)
+TableS1 <- make.table.from.dredge.output(model.sel.prop.at.nest)
+write.csv(TableS1, "output/TableS1 - Proportion_at_nest.csv")
+sapply(get.models(model.sel.prop.at.nest, subset=T), predict, new.data=expand.grid(breeding.phase=c('3.eggs','4.breeding.phase'), sex=c('F','M'))) # predicted values for each model in the model selection table
+# useful link how to model average predictions (though without confidence intervals): https://sites.google.com/site/rforfishandwildlifegrads/home/mumin_usage_examples?authuser=0 
+# get predictions for the most parsimonious model, run with REML: 
+# effects returned by predict() are conditional effects (i.e. these are conditioned on certain (reference) levels of factors), while emmeans() returns marginal means, since the effects are “marginalized” (or “averaged”) over the levels of factors.
+# it seems to me that marginal means are preferred. 
+m.pars.prop.at.nest = get.models(model.sel.prop.at.nest,1,method='REML')[[1]]
+marginal.means.prop.nest <- as.data.frame(emmeans(m.pars.prop.at.nest, ~breeding.phase))
+marginal.means.prop.nest <- cbind(marginal.means.prop.nest[,c('breeding.phase','df')], plogis(as.matrix(marginal.means.prop.nest[,c('emmean','lower.CL','upper.CL')])))
+
+# (2) PROPORTION OF TIME SPENT FORAGING
+duration_behaviour_bird_phase_year$logit_prop_for <- qlogis(duration_behaviour_bird_phase_year$prop_for)
+m_prop_for.phasexsex = lme(logit_prop_for~breeding.phase*sex, data=duration_behaviour_bird_phase_year, random=~1|year/birdID, method="ML") 
+model.sel.prop.for <- dredge(m_prop_for.phasexsex)
+TableS2 <- make.table.from.dredge.output(model.sel.prop.for)
+write.csv(TableS2, "output/TableS2 - Proportion_foraging.csv")
+m.pars.prop.for = get.models(model.sel.prop.for,1,method='REML')[[1]]
+emmeans.prop.for <- emmeans(m.pars.prop.for, pairwise~sex+breeding.phase) # sign difference within females: eggs<chicks<post+ ; chicks=post-, post+=post-, )  vs chicks, eggs vs  male.eggs vs female.eggs, female.eggs vs female.chicks, 
+marginal.means.prop.for <- as.data.frame(emmeans.prop.for$emmeans)
+cbind(marginal.means.prop.for, plogis(as.matrix(marginal.means.prop.for[,c('emmean','lower.CL','upper.CL')])))
 
 # check assumptions of homogeneity of variances in relation to fitted values and explanatory variables:
 windows()
