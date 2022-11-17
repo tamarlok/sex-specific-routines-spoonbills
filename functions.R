@@ -283,7 +283,7 @@ determine.breeding.phases <- function(df, day_hatched=NA, day_caught=NA, day_hat
   df$lat_rnd=round(df$latitude, digit=5) 
   df$lon_rnd=round(df$longitude, digit=6) 
   
-  # rough determination of breeding phases, irrespective of when eggs are being laid
+  # rough determination of breeding phases, irrespective of when eggs have been laid (the latter is only known for nests with known hatch dates)
   # assuming that breeding starts upon arrival on the Oosterkwelder of Schiermonnikoog and ends at the day after the last visit of the Oosterkwelder
   df$schier.kwelder <- ifelse(df$habitat=="Schier_Kwelder",1,0)
   schier.kwelder.points = aggregate(schier.kwelder ~ year + yday_CEST, df, sum)
@@ -298,6 +298,8 @@ determine.breeding.phases <- function(df, day_hatched=NA, day_caught=NA, day_hat
   duration.per.coord = aggregate(duration~lat_rnd+lon_rnd, df, sum)
   duration.per.coord = duration.per.coord[order(duration.per.coord$duration, decreasing=TRUE),][1:20,]
   coord.nest1 = duration.per.coord[1,1:2] # determine coordinates nest as the coordinates visited for the longest time 
+  df$lat.nest1=coord.nest1$lat_rnd
+  df$lon.nest1=coord.nest1$lon_rnd
   # calculate distance to nest:
   df$dist.nest1 = distCosine(as.matrix(df[,c('longitude','latitude')]), coord.nest1[,c('lon_rnd','lat_rnd')], r=6378137) # gives the distance in meters
   # to get around 50% nest attendance during egg incubation, a diameter of about 5 meter is required around the nest to define that the bird is on the nest
@@ -316,28 +318,20 @@ determine.breeding.phases <- function(df, day_hatched=NA, day_caught=NA, day_hat
   names(hours.on.mainland)[2]='hours.on.mainland'
   # last GPS fix of this bird in a certain year (used for plotting) 
   date.last.fix = max(df$yday_CEST)
-  nest.coords <- data.frame(lat.nest=coord.nest1$lat_rnd, lon.nest=coord.nest1$lon_rnd, day.first.5h=nest1.first.day.5h, day.last.5h=nest1.last.day.5h) # if there was only a single nesting attempt, this will be the nest.coords. If there is a second nesting attempt (determined below), nest.coords will be overwritten, consisting of two rows associated with the two nesting attempts in correct order. 
   # determine whether the 1st nesting attempt was real (i.e. more than 5 days of >5 hours nest attendance, on Schier):
   nest1.attendance$more.than.5h = ifelse(nest1.attendance$hours.on.nest>=5,1,0)
   nest1.ndays.5h = sum(nest1.attendance$more.than.5h) # calculcates the number of days that this place is visited for more than 5 hours.
   # determine if breeding attempt 1 was a real breeding attempt (more than 5 days with more than 5 hours nest attendance):
-  if (is.na(unique(df$habitat[df$nest1==1])[1])) nest1.real=0 else nest1.real = ifelse(nest1.ndays.5h>=5 & unique(df$habitat[df$nest1==1])[1]=='Schier_Kwelder', 1, 0)
-  
-  # save the nest coordinates if nest1.real=1
-  if (nest1.real==1) {
-    df$lat.nest1=coord.nest1$lat_rnd
-    df$lon.nest1=coord.nest1$lon_rnd
-  } else {
-    df$lat.nest1=NA
-    df$lon.nest1=NA
-  }
-  
+  if (is.na(unique(df$habitat[df$nest1==1])[1])) df$nest1.real=0 else df$nest1.real = ifelse(nest1.ndays.5h>=5 & unique(df$habitat[df$nest1==1])[1]=='Schier_Kwelder', 1, 0)
+
   # determine if there was another breeding attempt:
   df.rest = df[df$dist.nest1>50,] # should be outside the GPS error range of the primary breeding attempt
   df.rest<-df.rest[order(df.rest$date_time),]
   duration.per.coord2 = aggregate(duration~lat_rnd+lon_rnd, df.rest, sum)
   duration.per.coord2 = duration.per.coord2[order(duration.per.coord2$duration, decreasing=TRUE),][1:20,]
   coord.nest2 = duration.per.coord2[1,1:2] # determine coordinates nest as the coordinates most visited
+  df$lat.nest2=coord.nest2$lat_rnd
+  df$lon.nest2=coord.nest2$lon_rnd
   df$dist.nest2 = distCosine(as.matrix(df[,c('longitude','latitude')]), coord.nest2[,c('lon_rnd','lat_rnd')], r=6378137) # gives the distance in meters
   df$nest2 = ifelse(df$dist.nest2<5,1,0)
   df$nest2.1m = ifelse(df$dist.nest2<1,1,0)
@@ -348,25 +342,9 @@ determine.breeding.phases <- function(df, day_hatched=NA, day_caught=NA, day_hat
   nest2.last.day.5h = max(nest2.attendance$yday_CEST[nest2.attendance$hours.on.nest>5])
   nest2.attendance$more.than.5h = ifelse(nest2.attendance$hours.on.nest>=5,1,0)
   nest2.ndays.5h = sum(nest2.attendance$more.than.5h) # calculcates the number of days that this place is visited for more than 5 hours.
-  
   # determine whether the 2nd nesting attempt was real (i.e. more than 5 days of >5 hours nest attendance, on Schier):
-  if (is.na(unique(df$habitat[df$nest2==1])[1])) nest2.real=0 else nest2.real = ifelse(nest2.ndays.5h>=5 & unique(df$habitat[df$nest2==1])[1]=='Schier_Kwelder', 1, 0)
+  if (is.na(unique(df$habitat[df$nest2==1])[1])) df$nest2.real=0 else df$nest2.real = ifelse(nest2.ndays.5h>=5 & unique(df$habitat[df$nest2==1])[1]=='Schier_Kwelder', 1, 0)
 
-  if ( nest2.real==1 ) { 
-    # recreate dataframe with nest.coords, now consisting of two rows. The order of the attempts is determined later.
-    nest.coords <- data.frame(lat.nest=c(coord.nest1$lat_rnd, coord.nest2$lat_rnd), lon.nest=c(coord.nest1$lon_rnd, coord.nest2$lon_rnd), day.first.5h=c(nest1.first.day.5h,nest2.first.day.5h), day.last.5h=c(nest1.last.day.5h,nest2.last.day.5h))
-    df$lat.nest2=coord.nest2$lat_rnd
-    df$lon.nest2=coord.nest2$lon_rnd
-  }
-  
-  if ( nest2.real==0 ) {
-    coord.nest2=NA
-    df$nest2=0
-    df$nest2.1m=0
-    df$lat.nest2=NA
-    df$lon.nest2=NA
-  }
-  
   # determining the breeding phase of the bird, only when hatchday (and sometimes hatchday2) is known:
   phase.doy = data.frame(yday_CEST=1:365, breeding.phase=NA)
   phase.doy$breeding.phase = 'pre-breeding'
@@ -399,13 +377,6 @@ determine.breeding.phases <- function(df, day_hatched=NA, day_caught=NA, day_hat
     }
     phase.doy$attempt[phase.doy$breeding.phase=='pre-breeding']<-0
     
-    # assign nest coordinates to correct attempts (with known hatchdates - so only data are corrected of nests where eggs hatched):
-    if (is.na(day_hatched)==F & is.na(day_hatched2)) attempt.hatchday <- data.frame(attempt=1, hatchday=day_hatched)
-    if (is.na(day_hatched2)==F) attempt.hatchday <- data.frame(attempt=1:2, hatchday=c(day_hatched, day_hatched2))
-    nest.coords <- merge(nest.coords, attempt.hatchday)
-    nest.coords <- nest.coords[nest.coords$hatchday>nest.coords$day.first.5h & nest.coords$hatchday<nest.coords$day.last.5h,]
-    phase.doy <- merge(phase.doy, nest.coords[,c('attempt','lat.nest','lon.nest')], all.x=T) # all.x=T is needed for cases where the nest attendance is outside the range of the hatch day. This was the case for 656 in 2015, when the logger stopped working.
-    phase.doy
     table(phase.doy$breeding.phase) # to check that egg phase is indeed 25 days, and chick phase 30 days. 
     
     # merge breeding phase and nest coordinate info with df 
@@ -417,14 +388,7 @@ determine.breeding.phases <- function(df, day_hatched=NA, day_caught=NA, day_hat
   if (is.na(day_hatched)&is.na(day_hatched2)) {
     df$attempt <- NA
     df$breeding.phase <- NA
-    df[,c('lat.nest','lon.nest')] <- c(NA,NA)
-    df[df$yday_CEST>=nest1.first.day.5h&df$yday_CEST<=nest1.last.day.5h,c('lat.nest','lon.nest')] <- coord.nest1 # only give the nest coordinates from the first until the last day that the bird is more than 5 hours per day on this coordinate.
-    if (nest2.real==1) df[df$yday_CEST>=nest2.first.day.5h&df$yday_CEST<=nest2.last.day.5h,c("lat.nest","lon.nest")] <- coord.nest2
   }
-  
-  # determine distance to nest
-  df$distance.to.nest <- NA
-  if ((nest1.real==1|nest2.real==1) & min(is.na(df$lat.nest))==0) df$distance.to.nest[is.na(df$lat.nest)==F] <- round(distCosine(df[is.na(df$lat.nest)==F,c('longitude','latitude')], df[is.na(df$lat.nest)==F,c('lon.nest','lat.nest')], r=6378137),3) # gives the distance in meters between nest location and actual position of the bird; only calculate this when there is at least one row where lat.nest is known.
   
   # calculate distance between subsequent points:
   df$distance.to.prev[2:dim(df)[1]] = round(distCosine(df[1:(dim(df)[1]-1),c('longitude','latitude')], df[2:dim(df)[1],c('longitude','latitude')], r=6378.137),3)
@@ -512,3 +476,21 @@ plot.nest.attendance <- function(df, breeding.phase="egg incubation", add.tide =
   mtext(paste(sex, unique(df$birdID), 'at nest during', breeding.phase, sep=' '), 3,1, outer=T)
   axis(1,at=60*(0:24),labels=0:24)
 }
+
+# make neat table for MS from dredge output
+make.table.from.dredge.output <- function(dredge_output, lme4=F) {
+  table.output <- as.data.frame(dredge_output)[,c('df','logLik','AICc','delta','weight')]
+  for (i in 1:dim(table.output)[1]) {
+    model.formula <- formula(eval(getCall(dredge_output, i))) # reruns only the selected model to retrieve its model formula
+    table.output$model.name[i] <- paste(model.formula[2], model.formula[3],sep='~')
+  }
+  table.output$'-2logL' <- table.output$logLik * -2
+  table.output$'d-2LogL' <- table.output$'-2logL' - min(table.output$'-2logL')
+  
+  table.output <- table.output[,c('model.name','df','-2logL','delta','weight')]
+  names(table.output)[c(2,4,5)] <- c('K','dAICc','Akaike.weight')
+  table.output[,3:5] <- format(round(table.output[,3:5],2), trim=T)
+  table.output
+}
+
+
