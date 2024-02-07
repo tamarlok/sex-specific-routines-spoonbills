@@ -39,13 +39,6 @@ library(ggplot2)
 library(png)
 library(DescTools)
 
-# to work on the NIOZ server, set wd:
-# setwd("/export/data01/user/tlok/Tamar/sex-specific-foraging-spoonbills") # for ymga server (session sexfor)
-# setwd("/export/lv6/user/tlok/Tamar/sex-specific-foraging-spoonbills") # for ada server
-# setwd("C:/Users/tlok/Documents/Analyses/14. Sex-specific foraging and habitat use of breeding spoonbills/sex-specific-foraging-spoonbills")
-
-# in case of different functions with the same name used in different packages, call the function as package::function 
-
 ### Set system time zone 
 Sys.setenv(TZ="GMT")
 ###
