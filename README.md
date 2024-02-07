@@ -1,2 +1,2 @@
-# sex-specific-foraging-spoonbills
-Sex-specific foraging range and habitat use of breeding Eurasian spoonbills
+# sex-specific-routines-spoonbills
+Sex-specific nest attendance rhythm and foraging habitat use of breeding Eurasian spoonbills
