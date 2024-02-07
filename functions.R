@@ -9,6 +9,14 @@ ImportGPSDataBird <- function(birdID, date_start, date_end) {
   df[order(df$date_time),]
 }
 
+ImportAllGPSDataBird <- function(birdID, date_start, date_end) {
+  df <- sqlQuery(db, query = paste("SELECT * FROM gps.ee_tracking_speed_limited 
+                                     WHERE device_info_serial = ",birdID,"AND  date_time >= '" , as.POSIXct(date_start, origin='1970-01-01', tz="UTC"),
+                                   "' AND date_time <= '", as.POSIXct(date_end, origin='1970-01-01', tz="UTC"), "'", sep = ''))
+  df[order(df$date_time),]
+}
+
+
 ImportSMSDataBird <- function(birdID, date_start, date_end) {
   df <- sqlQuery(db, query = paste("SELECT device_info_serial,  
                                      date_time, longitude,
@@ -21,6 +29,13 @@ ImportSMSDataBird <- function(birdID, date_start, date_end) {
 ImportAccDataBird <- function(birdID, date_start, date_end) {
   df <- sqlQuery(db, query = paste("SELECT device_info_serial,  
                                    date_time, index, x_acceleration, y_acceleration, z_acceleration FROM gps.ee_acceleration_limited 
+                                   WHERE device_info_serial = ",birdID,"AND  date_time >= '" , as.POSIXct(date_start, origin='1970-01-01', tz="UTC"),
+                                   "' AND date_time <= '", as.POSIXct(date_end, origin='1970-01-01', tz="UTC"), "'", sep = ''))
+  df[order(df$date_time),]
+}
+
+ImportAllAccDataBird <- function(birdID, date_start, date_end) {
+  df <- sqlQuery(db, query = paste("SELECT * FROM gps.ee_acceleration_limited 
                                    WHERE device_info_serial = ",birdID,"AND  date_time >= '" , as.POSIXct(date_start, origin='1970-01-01', tz="UTC"),
                                    "' AND date_time <= '", as.POSIXct(date_end, origin='1970-01-01', tz="UTC"), "'", sep = ''))
   df[order(df$date_time),]
@@ -277,7 +292,7 @@ from.list.to.df <- function(list) {   # change from list to dataframe
 
 # function to determine nest coordinates and calculate nest attendance 
 # make the plotting optional, as this is not possible on the NIOZ cluster
-determine.breeding.phases <- function(df, day_hatched=NA, day_caught=NA, day_hatched2=NA, successful=0) {
+determine.breeding.phases <- function(df, day_hatched=NA, day_hatched2=NA, successful=0) {
   df=df[df$duration<61,] # only use data with a duration of one hour or less. 
   df <- na.omit(df) # this removes the points for which no habitat info is available, and the first and last point of a bird in each year, as duration could not be calculated (as time_until_previous or time_until_next was NA)
   df$lat_rnd=round(df$latitude, digit=5) 
@@ -323,6 +338,7 @@ determine.breeding.phases <- function(df, day_hatched=NA, day_caught=NA, day_hat
   nest1.ndays.5h = sum(nest1.attendance$more.than.5h) # calculcates the number of days that this place is visited for more than 5 hours.
   # determine if breeding attempt 1 was a real breeding attempt (more than 5 days with more than 5 hours nest attendance):
   if (is.na(unique(df$habitat[df$nest1==1])[1])) df$nest1.real=0 else df$nest1.real = ifelse(nest1.ndays.5h>=5 & unique(df$habitat[df$nest1==1])[1]=='Schier_Kwelder', 1, 0)
+  nest1.real = unique(df$nest1.real)
 
   # determine if there was another breeding attempt:
   df.rest = df[df$dist.nest1>50,] # should be outside the GPS error range of the primary breeding attempt
@@ -344,6 +360,7 @@ determine.breeding.phases <- function(df, day_hatched=NA, day_caught=NA, day_hat
   nest2.ndays.5h = sum(nest2.attendance$more.than.5h) # calculcates the number of days that this place is visited for more than 5 hours.
   # determine whether the 2nd nesting attempt was real (i.e. more than 5 days of >5 hours nest attendance, on Schier):
   if (is.na(unique(df$habitat[df$nest2==1])[1])) df$nest2.real=0 else df$nest2.real = ifelse(nest2.ndays.5h>=5 & unique(df$habitat[df$nest2==1])[1]=='Schier_Kwelder', 1, 0)
+  nest2.real <- unique(df$nest2.real)
 
   # determining the breeding phase of the bird, only when hatchday (and sometimes hatchday2) is known:
   phase.doy = data.frame(yday_CEST=1:365, breeding.phase=NA)
@@ -362,21 +379,25 @@ determine.breeding.phases <- function(df, day_hatched=NA, day_caught=NA, day_hat
         phase.doy$breeding.phase[phase.doy$yday_CEST>=day_hatched&phase.doy$yday_CEST<=nest1.last.day.5h]='chicks' # an earlier unsuccessful breeding attempt may have reached the chick phase; we assume that the chicks died on the last day the parent was at the nest for 5 hours (this is the last day with breeding phase 'chicks'; the next day it is 'pre-breeding' again.
       }
     } else { # if successful==0
-      if (is.na(day_hatched)==F) phase.doy$breeding.phase[phase.doy$yday_CEST>=day_hatched&phase.doy$yday_CEST<=nest1.last.day.5h]='chicks'
-      if (is.na(day_hatched2)==F) phase.doy$breeding.phase[phase.doy$yday_CEST>=day_hatched2&phase.doy$yday_CEST<=nest2.last.day.5h]='chicks' # if nest2.last.day.5h=NULL, this code does nothing
-      phase.doy$breeding.phase[phase.doy$yday_CEST>max(nest1.last.day.5h,nest2.last.day.5h)]='post.breeding.unsuccessful'
+      if (is.na(day_hatched)==F) phase.doy$breeding.phase[phase.doy$yday_CEST>=day_hatched & phase.doy$yday_CEST<=nest1.last.day.5h]='chicks'
+      if (is.na(day_hatched2)==F) phase.doy$breeding.phase[phase.doy$yday_CEST>=day_hatched2 & phase.doy$yday_CEST<=nest2.last.day.5h]='chicks' # if nest2.last.day.5h=NULL, this code does nothing
+      if (nest2.real==1) phase.doy$breeding.phase[phase.doy$yday_CEST > max(nest1.last.day.5h,nest2.last.day.5h)]='post.breeding.unsuccessful' else 
+        phase.doy$breeding.phase[phase.doy$yday_CEST > nest1.last.day.5h]='post.breeding.unsuccessful'  
     }
-  
-    ## Determine order of attempts (including not monitored attempts prior to the first real attempt)
-    phase.doy$attempt = 0
-    if (phase.doy$breeding.phase[1]=='eggs'|phase.doy$breeding.phase[1]=='chicks'|phase.doy$breeding.phase[1]=='breeding') phase.doy$attempt = 1
+
+    # Assigning attempts, so that pre-breeding is counted within the breeding attempt: 
+    phase.doy$attempt = 1
     for (i in 2:dim(phase.doy)[1]) {
-      if ((phase.doy$breeding.phase[i]=='eggs'|phase.doy$breeding.phase[i]=='breeding')&
-          phase.doy$breeding.phase[i-1]!='eggs'&phase.doy$breeding.phase[i-1]!='breeding'&phase.doy$breeding.phase[i-1]!='chicks') phase.doy$attempt[i]=phase.doy$attempt[i-1]+1
-      else phase.doy$attempt[i]=phase.doy$attempt[i-1]
+      if ((phase.doy$breeding.phase[i]==phase.doy$breeding.phase[i-1]) |
+          (phase.doy$breeding.phase[i]=='eggs'&phase.doy$breeding.phase[i-1]=='pre-breeding') |
+          (phase.doy$breeding.phase[i]=='chicks'&phase.doy$breeding.phase[i-1]=='eggs') |
+          (phase.doy$breeding.phase[i]=='post.breeding.successful'&phase.doy$breeding.phase[i-1]=='chicks') |
+          (phase.doy$breeding.phase[i]=='post.breeding.unsuccessful'&phase.doy$breeding.phase[i-1]=='chicks'))
+        phase.doy$attempt[i]=phase.doy$attempt[i-1]
+      else phase.doy$attempt[i]=phase.doy$attempt[i-1]+1 
     }
-    phase.doy$attempt[phase.doy$breeding.phase=='pre-breeding']<-0
     
+
     table(phase.doy$breeding.phase) # to check that egg phase is indeed 25 days, and chick phase 30 days. 
     
     # merge breeding phase and nest coordinate info with df 
@@ -455,7 +476,7 @@ plot.breeding.phases.and.nest.schier.attendance <- function(x) {
 }
 
 # plot nest attendance, potentially in relation to the tide 
-plot.nest.attendance <- function(df, breeding.phase="egg incubation", add.tide = T) {
+plot.nest.attendance <- function(df, breeding.phase="incubation", add.tide = T) {
   df$minute <- minute(df$date_time)
   df$day_min = df$hour_CEST*60+df$minute # here: it makes calculations with hour_CEST and min_CEST which is summertime. 
   windows()
@@ -478,15 +499,16 @@ plot.nest.attendance <- function(df, breeding.phase="egg incubation", add.tide =
 }
 
 # make neat table for MS from dredge output
-make.table.from.dredge.output <- function(dredge_output, lme4=F) {
-  table.output <- as.data.frame(dredge_output)[,c('df','logLik','AICc','delta','weight')]
+make.table.from.dredge.output <- function(dredge_output) {
+  table.output <- as.data.frame(dredge_output)
   for (i in 1:dim(table.output)[1]) {
-    model.formula <- formula(eval(getCall(dredge_output, i))) # reruns only the selected model to retrieve its model formula
-    table.output$model.name[i] <- paste(model.formula[2], model.formula[3],sep='~')
+    expl.vars = table.output[i,2:(which(names(table.output)=='df')-1)]
+    expl.vars = names(expl.vars)[!is.na(expl.vars)]
+    model.formula = paste(expl.vars,collapse=" + ")
+    table.output$model.name[i] <- model.formula
   }
   table.output$'-2logL' <- table.output$logLik * -2
   table.output$'d-2LogL' <- table.output$'-2logL' - min(table.output$'-2logL')
-  
   table.output <- table.output[,c('model.name','df','-2logL','delta','weight')]
   names(table.output)[c(2,4,5)] <- c('K','dAICc','Akaike.weight')
   table.output[,3:5] <- format(round(table.output[,3:5],2), trim=T)
@@ -494,3 +516,25 @@ make.table.from.dredge.output <- function(dredge_output, lme4=F) {
 }
 
 
+plot.sign.arrow <- function(x1=1, x2=2, ymin=0, ymax=1, yrel=0.9, sign="***", col="black", fontsize=1.5, dist.text=0.015) {
+  arrows(x1,ymin+yrel*(ymax-ymin),x2,ymin+yrel*(ymax-ymin), length=0, code=1, col=col)
+  arrows(x1,ymin+yrel*(ymax-ymin),x1,ymin+(yrel-0.015)*(ymax-ymin), length=0, code=1, col=col)
+  arrows(x2,ymin+yrel*(ymax-ymin),x2,ymin+(yrel-0.015)*(ymax-ymin), length=0, code=1, col=col)
+  text(x1+0.5*(x2-x1),ymin+(yrel+dist.text)*(ymax-ymin), sign, col=col, cex=fontsize)
+} 
+
+plot.sign.prop.for <- function(ymin, ymax, yrel=0.9, signs = c("***", "***", "***", "***", "***"), col="black", dist.text=0.015, fontsize=1.5) {
+  plot.sign.arrow(1, 1.3, ymin=ymin, ymax=ymax, yrel=yrel, sign=signs[1], dist.text=dist.text, fontsize=fontsize)
+  plot.sign.arrow(2, 2.3, ymin=ymin, ymax=ymax, yrel=yrel, sign=signs[2], dist.text=dist.text, fontsize=fontsize)
+  plot.sign.arrow(3, 3.3, ymin=ymin, ymax=ymax, yrel=yrel, sign=signs[3], dist.text=dist.text, fontsize=fontsize)
+  plot.sign.arrow(4, 4.3, ymin=ymin, ymax=ymax, yrel=yrel, sign=signs[4], dist.text=dist.text, fontsize=fontsize)
+  plot.sign.arrow(5, 5.3, ymin=ymin, ymax=ymax, yrel=yrel, sign=signs[5], dist.text=dist.text, fontsize=fontsize)
+}
+
+
+plot.sign.for.trips <- function(ymin=0, ymax, yrel=0.9, signs = c("***", "***", "***", "***"), fontsize=1.5) {
+  plot.sign.arrow(1, 1.3, ymin=ymin, ymax=ymax, yrel=0.9, sign=signs[1])
+  plot.sign.arrow(2, 2.3, ymin=ymin, ymax=ymax, yrel=0.9, sign=signs[2])
+  plot.sign.arrow(1, 2, ymin=ymin, ymax=ymax, yrel=0.93, sign=signs[3], col="lightcoral")
+  plot.sign.arrow(1.3, 2.3, ymin=ymin, ymax=ymax, yrel=0.96, sign=signs[4], col="lightskyblue")
+}

@@ -1,316 +1,401 @@
 source("functions.R") # to have the most updated version of the functions
 Sys.setenv(TZ='Europe/Amsterdam')
-gps.breeding.data.behav <- gps.breeding.data.behav.sel
 
-### Investigate patterns of total time spent foraging and attending the nest per day:
-gps.breeding.data.behav$at_nest <- 0
-gps.breeding.data.behav$at_nest[gps.breeding.data.behav$behaviour2=='at_nest'] <- 1
-gps.breeding.data.behav$foraging <- 0
-gps.breeding.data.behav$foraging[gps.breeding.data.behav$behaviour2=='foraging_freshwater'|gps.breeding.data.behav$behaviour2=='foraging_brackish'|gps.breeding.data.behav$behaviour2=='foraging_marine'] <- 1 # foraging on land is not considered as foraging
-gps.breeding.data.behav$foraging_marine <- 0
-gps.breeding.data.behav$foraging_marine[gps.breeding.data.behav$behaviour2=='foraging_brackish'|gps.breeding.data.behav$behaviour2=='foraging_marine'] <- 1
+gps.breeding.data.behav$birdyear = as.factor(paste(gps.breeding.data.behav$birdID, gps.breeding.data.behav$year, sep="_"))
+table(gps.breeding.data.behav$breeding.phase)
 
-gps.breeding.data.behav$duration_foraging <- gps.breeding.data.behav$foraging * gps.breeding.data.behav$duration_behav
-gps.breeding.data.behav$duration_foraging_marine <- gps.breeding.data.behav$foraging_marine * gps.breeding.data.behav$duration_behav
-gps.breeding.data.behav$duration_nest_attendance <- gps.breeding.data.behav$at_nest * gps.breeding.data.behav$duration_behav
+gps.breeding.data.behav = gps.breeding.data.behav[order(gps.breeding.data.behav$birdID, gps.breeding.data.behav$date_time),]
 
-# duration per bird per date (only calculated for exploration plots)
-duration_behaviour_yday_bird_phase = aggregate(cbind(duration_behav/60,duration_nest_attendance/60,duration_foraging/60,duration_foraging_marine/60)~year+birdID+yday_CEST+day_rel_hatching+week_rel_hatching+sex+breeding.phase, gps.breeding.data.behav, sum)
-names(duration_behaviour_yday_bird_phase)[8:11] = c("dur_tot_yday","dur_at_nest_yday","dur_foraging_yday","dur_foraging_marine_yday")
-duration_behaviour_yday_bird_phase = duration_behaviour_yday_bird_phase[order(duration_behaviour_yday_bird_phase$year, duration_behaviour_yday_bird_phase$birdID, duration_behaviour_yday_bird_phase$yday_CEST),]
-head(duration_behaviour_yday_bird_phase)
-duration_behaviour_yday_bird_phase$prop_for <- duration_behaviour_yday_bird_phase$dur_foraging_yday/duration_behaviour_yday_bird_phase$dur_tot_yday
-# duration per bird per breeding phase (used for Fig 3 and for statistics)
-duration_behaviour_bird_phase_year = aggregate(cbind(duration_behav/60,duration_nest_attendance/60,duration_foraging/60,duration_foraging_marine/60)~year+birdID+sex+breeding.phase, gps.breeding.data.behav, sum)
-names(duration_behaviour_bird_phase_year)[5:8] = c("dur_tot","dur_at_nest","dur_foraging","dur_foraging_marine")
-duration_behaviour_bird_phase_year = duration_behaviour_bird_phase_year[order(duration_behaviour_bird_phase_year$year, duration_behaviour_bird_phase_year$birdID),]
-duration_behaviour_bird_phase_year$prop_nest <- duration_behaviour_bird_phase_year$dur_at_nest/duration_behaviour_bird_phase_year$dur_tot
-duration_behaviour_bird_phase_year$prop_for <- duration_behaviour_bird_phase_year$dur_foraging/duration_behaviour_bird_phase_year$dur_tot
-duration_behaviour_bird_phase_year$prop_for_marine <- duration_behaviour_bird_phase_year$dur_foraging_marine/duration_behaviour_bird_phase_year$dur_foraging
+table(gps.breeding.data.behav$birdID, gps.breeding.data.behav$yday_CEST, gps.breeding.data.behav$year)
+names(gps.breeding.data.behav)
+
+# remove NA's: (this was already done, as no rows are removed after running the below line)
+gps.breeding.data.behav <- na.omit(gps.breeding.data.behav[,c('birdID','birdyear','date_time','yday_CEST','hour_CEST','month','week','daynight','twilight_day_night','sunset','sunrise','dusk','dawn','tidal_phase','habitat','habitat_type','habitat_salinity','land_water','hatch_day','day_rel_hatching','week_rel_hatching','breeding.phase','breeding.phase2','breeding.phase.nr','sex','behaviour','behaviour2', 'lat.nest','lon.nest','distance.to.nest','at_nest','foraging','foraging_marine','year','diel_rad','tidal_stage_rad','solar_stage_rad')])
+gps.breeding.data.behav$hour_f <- as.factor(gps.breeding.data.behav$hour_CEST)
+gps.breeding.data.behav$sex <- as.factor(gps.breeding.data.behav$sex)
+gps.breeding.data.behav$birdID <- as.factor(gps.breeding.data.behav$birdID)
+gps.breeding.data.behav$year <- as.factor(gps.breeding.data.behav$year)
+gps.breeding.data.behav$breeding.phase <- as.factor(gps.breeding.data.behav$breeding.phase)
+gps.breeding.data.behav$sexxbp = interaction(gps.breeding.data.behav$sex, gps.breeding.data.behav$breeding.phase)
+gps.breeding.data.behav.phase34 <- gps.breeding.data.behav[gps.breeding.data.behav$breeding.phase%in%c('3.eggs','4.chicks'),]
 
 # Statistical analysis
 # Discussion on whether (or not) to use p-values with mixed-effects models (https://stats.stackexchange.com/questions/22988/how-to-obtain-the-p-value-check-significance-of-an-effect-in-a-lme4-mixed-mode)
-# I decided to go for model selection approach, as the use of p-values in mixed-effects models is arbritary, and AIC provides more useful information on the level of support for certain effects (instead of just a boundary value for whether to reject a null hypothesis.
+# I decided to go for model selection approach, as the use of p-values in mixed-effects models is arbritary, and AIC provides more useful information on the level of support for certain effects (instead of just a boundary value for whether to reject a null hypothesis).
 
-# (1) PROPORTION OF TIME SPENT ATTENDING THE NEST (only comparing egg incubation and chick rearing phase)
-duration_behaviour_bird_phase_year_egg_chicks <- duration_behaviour_bird_phase_year[duration_behaviour_bird_phase_year$breeding.phase%in%c('3.eggs','4.chicks'),]
-min_prop_nest <- min(duration_behaviour_bird_phase_year_egg_chicks$prop_nest[duration_behaviour_bird_phase_year_egg_chicks$prop_nest>0])
-duration_behaviour_bird_phase_year_egg_chicks$prop_nest[duration_behaviour_bird_phase_year_egg_chicks$prop_nest==0] = min_prop_nest
-duration_behaviour_bird_phase_year_egg_chicks$logit_prop_nest <- qlogis(duration_behaviour_bird_phase_year_egg_chicks$prop_nest)
-m_prop_nest.phasexsex = lme(logit_prop_nest~breeding.phase*sex, data=duration_behaviour_bird_phase_year_egg_chicks, random=~1|year/birdID, method="ML") 
-model.sel.prop.at.nest <- dredge(m_prop_nest.phasexsex)
-TableS1 <- make.table.from.dredge.output(model.sel.prop.at.nest)
-write.csv(TableS1, "output/TableS1 - Proportion_at_nest.csv")
-sapply(get.models(model.sel.prop.at.nest, subset=T), predict, new.data=expand.grid(breeding.phase=c('3.eggs','4.breeding.phase'), sex=c('F','M'))) # predicted values for each model in the model selection table
-# useful link how to model average predictions (though without confidence intervals): https://sites.google.com/site/rforfishandwildlifegrads/home/mumin_usage_examples?authuser=0 
-# get predictions for the most parsimonious model, run with REML: 
-# effects returned by predict() are conditional effects (i.e. these are conditioned on certain (reference) levels of factors), while emmeans() returns marginal means, since the effects are “marginalized” (or “averaged”) over the levels of factors.
-# it seems to me that marginal means are preferred. 
-m.pars.prop.at.nest = get.models(model.sel.prop.at.nest,1,method='REML')[[1]]
-marginal.means.prop.nest <- as.data.frame(emmeans(m.pars.prop.at.nest, ~breeding.phase))
-marginal.means.prop.nest <- cbind(marginal.means.prop.nest[,c('breeding.phase','df')], plogis(as.matrix(marginal.means.prop.nest[,c('emmean','lower.CL','upper.CL')])))
+# (1) PROBABILITY OF ATTENDING THE NEST (only comparing egg incubation and chick rearing phase)
 
-# (2) PROPORTION OF TIME SPENT FORAGING
-duration_behaviour_bird_phase_year$logit_prop_for <- qlogis(duration_behaviour_bird_phase_year$prop_for)
-m_prop_for.phasexsex = lme(logit_prop_for~breeding.phase*sex, data=duration_behaviour_bird_phase_year, random=~1|year/birdID, method="ML") 
-model.sel.prop.for <- dredge(m_prop_for.phasexsex)
-TableS2 <- make.table.from.dredge.output(model.sel.prop.for)
-write.csv(TableS2, "output/TableS2 - Proportion_foraging.csv")
-m.pars.prop.for = get.models(model.sel.prop.for,1,method='REML')[[1]]
-emmeans.prop.for <- emmeans(m.pars.prop.for, pairwise~sex+breeding.phase) # sign difference within females: eggs<chicks<post+ ; chicks=post-, post+=post-, )  vs chicks, eggs vs  male.eggs vs female.eggs, female.eggs vs female.chicks, 
-marginal.means.prop.for <- as.data.frame(emmeans.prop.for$emmeans)
-cbind(marginal.means.prop.for, plogis(as.matrix(marginal.means.prop.for[,c('emmean','lower.CL','upper.CL')])))
+# trying glmer on raw data; this ignores differences in duration associated with GPS-behaviour fixes. Alternatively, we could also exclude points associated with durations >10 minutes.
 
-# check assumptions of homogeneity of variances in relation to fitted values and explanatory variables:
+a = Sys.time()
+glmer.nestprob <- glmer(at_nest~breeding.phase*sex+(1|year)+(1|birdID), gps.breeding.data.behav.phase34, family='binomial', na.action='na.fail', nAGQ=0) # nACQ=0 makes convergence about 4 times faster. 
+Sys.time() - a
+glmer.nestprob # (Intercept)=0.01051
+
+# Check model assumptions for glmer models
+# https://stats.stackexchange.com/questions/524376/testing-glmer-model-assumptions-optionally-in-r
+# using package DHARMa:
+# https://cran.r-project.org/web/packages/DHARMa/vignettes/DHARMa.html#installing-loading-and-citing-the-package
+# (1) check for over- or underdispersion of the data:
+simOutput.glmer.nestprob <- simulateResiduals(glmer.nestprob, plot=F)
+residuals(simOutput.glmer.nestprob)
 windows()
-plot(m_for.dur.phasexsex)
-qqnorm(m_for.dur.phasexsex)
-qqnorm(m_for.dur.phasexsex, ~ranef(., level=1))
-qqnorm(m_for.dur.phasexsex, ~ranef(., level=2))
-# check for equal variances among explanatory variables
-plot( m_for.dur.phasexsex, resid(., type = "p") ~ fitted(.) | sex, id = 0.05, adj = 0 )
-plot( m_for.dur.phasexsex, resid(., type = "p") ~ fitted(.) | breeding.phase * sex )
-# calculate significance of explanatory variables 
-# different methods to do so...
-anova(m_for.dur.phasexsex, type="marginal")
-Anova(m_for.dur.phasexsex,type='III')
-dredge(m_for.dur.phasexsex)
-summary(m_for.dur.phasexsex)
+plot(simOutput.glmer.nestprob)
+# plots can also be called separately:
+plotQQunif(simOutput.glmer.nestprob)
+plotResiduals(simOutput.glmer.nestprob)
 
-# way to provide p-values instead of perform model selection is to use Wald or LRT tests:
-# https://www.ssc.wisc.edu/sscc/pubs/MM/MM_TestEffects.html
-m_for.dur.phasexsex.for.lmer <- lmer(logit_prop_for~breeding.phase*sex + (1|year/birdID), data=foraging_duration_phase_year_bird, REML=FALSE) 
-anova(m_for.dur.phasexsex.for.lmer, type="marginal")
-Anova(m_for.dur.phasexsex.for.lmer)
-summary(m_for.dur.phasexsex.for.lmer)
-qqplot(m_for.dur.phasexsex.for.lmer)
+# check for homogeneity of residuals in relation to explanatory variables:
+modsel.nestprob <- dredge(glmer.nestprob)
+Table1a <- make.table.from.dredge.output(modsel.nestprob)
+Table1a
+write.csv(Table1a, "output/Table3a - Proportion_at_nest with glmer.csv")
+m.pars.nestprob = get.models(modsel.nestprob,1)[[1]] # with glmer, you apparently cannot choose between ML and REML
+marginal.emmeans.nestprob <- emmeans(m.pars.nestprob, pairwise~breeding.phase*sex)
+marginal.emmeans.nestprob.df <- as.data.frame(marginal.emmeans.nestprob$emmeans)
+marginal.emmeans.nestprob.df  <- cbind(marginal.emmeans.nestprob.df[,c('sex','breeding.phase','df')], plogis(as.matrix(marginal.emmeans.nestprob.df[,c('emmean','asymp.LCL','asymp.UCL')])))
+marginal.emmeans.nestprob.df
+pairs(marginal.emmeans.nestprob)
+pairs(marginal.emmeans.nestprob, by='sex')
+pairs(marginal.emmeans.nestprob, by='breeding.phase') # no sex differences in nest attendance during either incubation or chick-rearing. 
 
-# Model selection method, selecting the most parsimonious model for plotting:
-dredge(m_for.dur.phasexsex)
-m_for.dur.phase_REML = lme(logit_prop_for~breeding.phase+sex, data=foraging_duration_phase_year_bird, random=~1|year/birdID, method="REML")
-summary(m_for.dur.phase_REML) 
-intervals(m_for.dur.phase_REML)
-emmeans_for_dur_phase_sex = emmeans(m_for.dur.phase_REML, pairwise~breeding.phase+sex) # within breeding phases, proportion of time spent foraging is higher in females than in males (p=0.0098). Proportion of time spent foraging decreases over the season, though the only pairwise comparison that was significant was between chick and post-breeding unsuccessful phase. # the most parsimonious model does not include the interaction between breeding phase and sex. However, perhaps it is true that in one of the breeding phases, the sexes significantly differ in time spent foraging (i.e. when caring for the eggs/chicks) but not during post-breeding?
-m_for.dur.phasexsex_REML = lme(logit_prop_for~breeding.phase*sex, data=foraging_duration_phase_year_bird, random=~1|year/birdID, method="REML")
-summary(m_for.dur.phasexsex_REML)
-lsmeans_for_dur_phasexsex = lsmeans(m_for.dur.phasexsex_REML, pairwise~breeding.phase*sex) 
-# when looking at the interaction model, only during the egg (p=0.0020) and chick phase (p=0.0378), females spend significantly more time foraging than males. 
-# within females, there were no significant differences in time spent foraging between breeding phases
-# within males, time spent foraging during chick phase was significant higher than during post-breeding unsuccessful phase. 
+# although the interaction between breeding phase and sex is supported, the pairwise compairsons between the sexes within breeding phases are not signifciant (p=0.71 during incubation and p=0.084 during chick-rearing). Both sexes attend the nest more during egg incubation than during chick-rearing. females attend the nest slightly more than males. The somehwat higher attendance of females during chick-rearing may be caused by the fact that females are often in the colony during the day when it is high tide (after having fed the chicks). They may also then attend the nest, but the male does not leave as he will take over again when the tide starts going out. 
 
+# (2) PROBABILITY OF FORAGING
 
-# Statistical analysis of proportion of foraging time spent in marine habitat
-for_prop_marine_bird_year_phase$prop_for_marine[for_prop_marine_bird_year_phase$prop_for_marine==1] <- 1-min(for_prop_marine_bird_year_phase$prop_for_marine)
-for_prop_marine_bird_year_phase$logit_prop_for_marine <- qlogis(for_prop_marine_bird_year_phase$prop_for_marine)
-m_for.marine.phasexsex = lme(logit_prop_for_marine~breeding.phase*sex, data=for_prop_marine_bird_year_phase, random=~1|year/birdID, method="ML") 
-dredge(m_for.marine.phasexsex)
-m_for.marine.phase.sex_REML = lme(logit_prop_for_marine~breeding.phase+sex, data=for_prop_marine_bird_year_phase, random=~1|year/birdID, method="REML")
-summary(m_for.marine.phase.sex_REML)
-lsmeans_for_marine_phase_sex = lsmeans(m_for.marine.phase.sex_REML, pairwise~breeding.phase+sex) # females forage significantly more in marine habitats than males. The proportion of time spent foraging in marine habitat was significantly higher during the egg phase than during the post-breeding phase (either success- or unsuccessful).
+glmer.forprob <- glmer(foraging~breeding.phase*sex+(1|year)+(1|birdID), gps.breeding.data.behav, family='binomial', na.action='na.fail', nAGQ=0) 
+summary(glmer.forprob)
+modsel.forprob <- dredge(glmer.forprob)
 
-# the most parsimonious model does not include the interaction between breeding phase and sex. however, perhaps it is true that in one of the breeding phases, the sexes significantly differ in time spent foraging (i.e. when caring for the eggs/chicks) but not during post-breeding?
-m_for.marine.phasexsex_REML = lme(logit_prop_for_marine~breeding.phase*sex, data=for_prop_marine_bird_year_phase, random=~1|year/birdID, method="REML")
-summary(m_for.marine.phasexsex_REML)
-lsmeans_for_marine_phasexsex = lsmeans(m_for.marine.phasexsex_REML, pairwise~breeding.phase*sex) 
-# during all breeding phases, females spend more time foraging in marine waters than males
-# within females, the proportion of time spent foraging in marine habitat does not differ between breeding phases. 
-# within males, the proportion of time spent foraging in marine habitat is only significantly higher during the egg phase than during the post-breeding unsuccessful phase. 
+Table1b <- make.table.from.dredge.output(modsel.forprob)
+write.csv(Table1b, "output/Table1b - Proportion_foraging with glmer.csv")
 
-# plot proportion of foraging in marine waters for males only, per individual per year. 
-males_prop_marine <- for_prop_marine_bird_year_phase[for_prop_marine_bird_year_phase$sex=='M'&(for_prop_marine_bird_year_phase$breeding.phase=='3.eggs'|for_prop_marine_bird_year_phase$breeding.phase=='4.chicks'),]
-males_prop_marine <- aggregate(prop_for_marine~birdID+year, males_prop_marine, mean)
-# plot ordered by prop_for_marine
-males_prop_marine <- males_prop_marine[order(males_prop_marine$prop_for_marine),]
-plot(males_prop_marine$prop_for_marine, xaxt='n', xlab='')
-axis(1, at=1:dim(males_prop_marine)[1], paste(males_prop_marine$birdID, males_prop_marine$year), las=2)
+marginal.means.forprob <- emmeans(glmer.forprob, ~breeding.phase*sex) 
+marginal.means.forprob.df <- as.data.frame(marginal.means.forprob)
+marginal.means.forprob.df  <- cbind(marginal.means.forprob.df[,c('sex','breeding.phase','df')], plogis(as.matrix(marginal.means.forprob.df[,c('emmean','asymp.LCL','asymp.UCL')])))
+marginal.means.forprob.df
+forprob.phasecomp = pairs(marginal.means.forprob, by='sex') # this compares "only" 5 estimates (within each sex)
+forprob.phasecomp = as.data.frame(forprob.phasecomp)
+forprob.phasecomp$z.ratio = round(forprob.phasecomp$z.ratio,2)
+forprob.phasecomp$sign = ifelse(forprob.phasecomp$p.value<0.001, "***",
+                                ifelse(forprob.phasecomp$p.value<0.01, "**",
+                                       ifelse(forprob.phasecomp$p.value<0.05, "*", "n.s.")))
 
-# plot ordered on mean prop_for_marine per individual, and then on year
-bird.data <- read.csv("data/raw/bird.data.csv", header=T)
-bird.data <- read.csv("bird.data.csv", header=T) # code for NIOZ-server
-males_prop_marine_mean <- aggregate(prop_for_marine~birdID, males_prop_marine, mean)
-names(males_prop_marine_mean)[2]<- "mean_prop_marine"
-males_prop_marine_mean <- merge(males_prop_marine_mean, bird.data[c(-12,-20),c('birdID','bodymass','headbill')]) # remove the biometry from the first two captures of 656 
+# extract female comparisons and make table out of it:
+forprob.phasecomp.F = forprob.phasecomp[forprob.phasecomp$sex=="F",]
+forprob.phasecomp.F.z.ratio = rbind(forprob.phasecomp.F$z.ratio[1:4],
+      c("",forprob.phasecomp.F$z.ratio[5:7]),
+      c("","",forprob.phasecomp.F$z.ratio[8:9]),
+      c("","","",forprob.phasecomp.F$z.ratio[10]))
+forprob.phasecomp.F.sign = rbind(forprob.phasecomp.F$sign[1:4],
+                                        c("",forprob.phasecomp.F$sign[5:7]),
+                                        c("","",forprob.phasecomp.F$sign[8:9]),
+                                        c("","","",forprob.phasecomp.F$sign[10]))
+forprob.phasecomp.F.z.ratio.sign = matrix(paste(forprob.phasecomp.F.z.ratio, forprob.phasecomp.F.sign, sep=""), ncol=4)
+write.table(forprob.phasecomp.F.z.ratio.sign, 'clipboard', sep='\t')
 
-# analyse proportion of marine foraging of males in relation to headbill length and body mass, 
-
-lm.HB <- lm(mean_prop_marine~headbill, males_prop_marine_mean)
-summary(lm.HB) # p=0.0366
+# extract female comparisons and make table out of it:
+forprob.phasecomp.M = forprob.phasecomp[forprob.phasecomp$sex=="M",]
+forprob.phasecomp.M.z.ratio = rbind(forprob.phasecomp.M$z.ratio[1:4],
+                                  c("",forprob.phasecomp.M$z.ratio[5:7]),
+                                  c("","",forprob.phasecomp.M$z.ratio[8:9]),
+                                  c("","","",forprob.phasecomp.M$z.ratio[10]))
+forprob.phasecomp.M.sign = rbind(forprob.phasecomp.M$sign[1:4],
+                               c("",forprob.phasecomp.M$sign[5:7]),
+                               c("","",forprob.phasecomp.M$sign[8:9]),
+                               c("","","",forprob.phasecomp.M$sign[10]))
+forprob.phasecomp.M.z.ratio.sign = matrix(paste(forprob.phasecomp.M.z.ratio, forprob.phasecomp.M.sign, sep=""), ncol=4)
+write.table(forprob.phasecomp.M.z.ratio.sign, 'clipboard', sep='\t')
 
 
-########### FIGURE 5 #############
-pdf("output/Fig5.pdf")
-plot(mean_prop_marine~headbill, males_prop_marine_mean, pch=19, cex=2, xlab='Head-bill length (mm)', ylab='Proportion marine foraging', cex.axis=1.2, cex.lab=1.3)
-abline(lm.HB)
-dev.off()
+pairs(marginal.means.forprob) # while this compares 10 estimates, it also makes irrelevant comparisons (like chicks.F vs eggs.M)
 
-males_prop_marine <- merge(males_prop_marine, males_prop_marine_mean)
-males_prop_marine <- males_prop_marine[order(males_prop_marine$mean_prop_marine, males_prop_marine$year),]
-windows()
-plot(males_prop_marine$prop_for_marine, xaxt='n', xlab='')
-axis(1, at=1:dim(males_prop_marine)[1], paste(males_prop_marine$birdID, males_prop_marine$year), las=2)
-# to do this in a neat way, we should work with logit transformed values...
+# for females: eggs<pre<chicks<(post.unsuc/post.suc)
+# for males: prop foraging is lowest and similar during pre-breeding and egg phase. (pre+egg)<post.unsuc.<chicks<post.suc;
 
-# what to do with the estimated foraging points on land; assume this is walking?
-# redo analysis to see if results change... however, then what should we do for the walking points in water? Assume they were foraging? this is rather arbitrary, as birds may actually be walking in water as well....
+forprob.sexcomp = pairs(marginal.means.forprob, by='breeding.phase')
+forprob.sexcomp = as.data.frame(forprob.sexcomp)
+forprob.sexcomp$sign = ifelse(forprob.sexcomp$p.value<0.001, "***",
+                              ifelse(forprob.sexcomp$p.value<0.01, "**",
+                                     ifelse(forprob.sexcomp$p.value<0.05, "*", "n.s.")))
+write.table(paste(round(forprob.sexcomp$z.ratio, 2), forprob.sexcomp$sign, sep=""), 'clipboard', sep='\t')
+# in all breeding phases, females forage more than males. The difference is largest during pre- en unsuccessful post-breeding .
 
-# properly analyse the timing of nest attendance and foraging in relation to the daynight and tidal cycle. 
-gps.breeding.data.behav$foraging <- 0
-gps.breeding.data.behav$foraging[gps.breeding.data.behav$behaviour=='foraging'] <- 1
-gps.breeding.data.behav$at_nest <- 0
-gps.breeding.data.behav$at_nest[gps.breeding.data.behav$behaviour2=='at_nest'] <- 1
 
-# add tide data:
-tide.data <- read.table("data/raw/getij_schiermonnikoog_2010-2019.txt", skip=4)
-tide.data <- read.table("getij_schiermonnikoog_2010-2019.txt", skip=4) # for NIOZ-server
-names(tide.data) <- c("date","time","lowhigh", "waterheight")
-tide.data$date_time <- dmy_hm(paste(tide.data$date, tide.data$time, sep=" "))
-tide.data$date_time_wintertime <- force_tz(tide.data$date_time, tzone="Etc/GMT-1")
-tide.data$date_time_UTC <- with_tz(tide.data$date_time_wintertime, tzone="UTC")
-tide.data$date_time_CEST <- with_tz(tide.data$date_time_wintertime, tzone="Europe/Amsterdam")
-tide.data$date_hour_CEST <- round_date(tide.data$date_time_CEST, "hour")
-tide.data$yday_CEST <- yday(tide.data$date_time_CEST)
-tide.data$hour_CEST <- hour(tide.data$date_time_CEST)
-tide.data$min_CEST <- minute(tide.data$date_time_CEST)
-tide.data$year <- year(tide.data$date_time_CEST)
-tide.data$day_min <- tide.data$hour_CEST*60+tide.data$min_CEST
-tide.data$lowhigh[tide.data$lowhigh==1]<-"high"
-tide.data$lowhigh[tide.data$lowhigh==2]<-"low"
-high.tides <- tide.data[tide.data$lowhigh=="high",c("year","yday_CEST", "waterheight","day_min")]
-low.tides <- tide.data[tide.data$lowhigh=="low",c("year","yday_CEST", "waterheight","day_min")]
-# determine on hour scale whether tide is low, incoming, high or outgoing:
-tidal.phase.hour <- expand.grid(hour=0:23, date=unique(tide.data$date))
-tidal.phase.hour$date_hour_CEST <- dmy_h(paste(tidal.phase.hour$date, tidal.phase.hour$hour, sep=" "))
-tidal.phase.hour$date_hour_CEST <- force_tz(tidal.phase.hour$date_hour_CEST, tzone="Europe/Amsterdam")
-tidal.phase.hour <- merge(tidal.phase.hour, tide.data[,c("date_hour_CEST","lowhigh")], all.x=T)
-tidal.phase.hour <- tidal.phase.hour[order(tidal.phase.hour$date_hour_CEST),]
-# make adjacent hour before and after the hour of low and high tide also low and high, resulting in 3 hour periods of low and high tide; then, the hours from low to high are labelled as "incoming" and from high to low outgoing:
-tidal.phase.hour$tide_min1 <- c(tidal.phase.hour$lowhigh[2:dim(tidal.phase.hour)[1]],NA)
-tidal.phase.hour$tide_plus1 <- c(NA,tidal.phase.hour$lowhigh[1:(dim(tidal.phase.hour)[1]-1)])
-tidal.phase.hour$tidal_phase <- tidal.phase.hour$lowhigh
-# fill in the spots where tide_min1 is not NA:
-tidal.phase.hour$tidal_phase[is.na(tidal.phase.hour$tide_min1)==F] <- tidal.phase.hour$tide_min1[is.na(tidal.phase.hour$tide_min1)==F]
-# fill in the spots where tide_min1 is not NA:
-tidal.phase.hour$tidal_phase[is.na(tidal.phase.hour$tide_plus1)==F] <- tidal.phase.hour$tide_plus1[is.na(tidal.phase.hour$tide_plus1)==F]
-# fill in the other NA values with incoming or outgoing
-tidal.phase.hour$tidal_phase[is.na(tidal.phase.hour$tidal_phase)] <- "unknown"
-for (i in 2:dim(tidal.phase.hour)[1]) {
-  if (tidal.phase.hour$tidal_phase[i-1]=='low'&tidal.phase.hour$tidal_phase[i]=="unknown") tidal.phase.hour$tidal_phase[i] <- "incoming"
-  if (tidal.phase.hour$tidal_phase[i-1]=='incoming'&tidal.phase.hour$tidal_phase[i]=="unknown") tidal.phase.hour$tidal_phase[i] <- "incoming"
-  if (tidal.phase.hour$tidal_phase[i-1]=='high'&tidal.phase.hour$tidal_phase[i]=="unknown") tidal.phase.hour$tidal_phase[i] <- "outgoing"
-  if (tidal.phase.hour$tidal_phase[i-1]=='outgoing'&tidal.phase.hour$tidal_phase[i]=="unknown") tidal.phase.hour$tidal_phase[i] <- "outgoing"
+# (3) PROPORTION OF TIME SPENT FORAGING IN MARINE (or brackish) HABITAT
+gps.breeding.data.behav.marfor <- gps.breeding.data.behav[gps.breeding.data.behav$foraging==1,]
+glmer.marforprob <- glmer(foraging_marine~breeding.phase*sex+(1|birdID)+(1|year), gps.breeding.data.behav.marfor, family='binomial', na.action='na.fail', nAGQ=0) 
+modsel.marforprob <- dredge(glmer.marforprob)
+
+Table1c <- make.table.from.dredge.output(modsel.marforprob)
+write.csv(Table1c, "output/Table1c - Proportion_foraging_marine with glmer.csv")
+
+marginal.emmeans.marforprob <- emmeans(glmer.marforprob, ~breeding.phase*sex)
+marginal.emmeans.marforprob.df <- as.data.frame(marginal.emmeans.marforprob)
+marginal.emmeans.marforprob.df  <- cbind(marginal.emmeans.marforprob.df[,c('sex','breeding.phase','df')], plogis(as.matrix(marginal.emmeans.marforprob.df[,c('emmean','asymp.LCL','asymp.UCL')])))
+marginal.emmeans.marforprob.df
+marginal.emmeans.marforprob$contrasts[c(1:4,10:12,18:19,25,5,14,22,29,35:45),] 
+marforprob.phasecomp <- as.data.frame(pairs(marginal.emmeans.marforprob, by='sex'))
+marforprob.phasecomp$z.ratio <- round(marforprob.phasecomp$z.ratio, 2)
+marforprob.phasecomp$sign <- ifelse(marforprob.phasecomp$p.value<0.05, "*","")
+# extract female comparisons and make table out of it:
+marforprob.phasecomp.F = marforprob.phasecomp[marforprob.phasecomp$sex=="F",]
+marforprob.phasecomp.F.z.ratio = rbind(marforprob.phasecomp.F$z.ratio[1:4],
+                                    c("",marforprob.phasecomp.F$z.ratio[5:7]),
+                                    c("","",marforprob.phasecomp.F$z.ratio[8:9]),
+                                    c("","","",marforprob.phasecomp.F$z.ratio[10]))
+marforprob.phasecomp.F.sign = rbind(marforprob.phasecomp.F$sign[1:4],
+                                 c("",marforprob.phasecomp.F$sign[5:7]),
+                                 c("","",marforprob.phasecomp.F$sign[8:9]),
+                                 c("","","",marforprob.phasecomp.F$sign[10]))
+marforprob.phasecomp.F.z.ratio.sign = matrix(paste(marforprob.phasecomp.F.z.ratio, marforprob.phasecomp.F.sign, sep=""), ncol=4)
+write.table(marforprob.phasecomp.F.z.ratio.sign, 'clipboard', sep='\t')
+# females: (pre=post+=post-)<(eggs=chicks)
+# extract female comparisons and make table out of it:
+marforprob.phasecomp.M = marforprob.phasecomp[marforprob.phasecomp$sex=="M",]
+marforprob.phasecomp.M.z.ratio = rbind(marforprob.phasecomp.M$z.ratio[1:4],
+                                       c("",marforprob.phasecomp.M$z.ratio[5:7]),
+                                       c("","",marforprob.phasecomp.M$z.ratio[8:9]),
+                                       c("","","",marforprob.phasecomp.M$z.ratio[10]))
+marforprob.phasecomp.M.sign = rbind(marforprob.phasecomp.M$sign[1:4],
+                                    c("",marforprob.phasecomp.M$sign[5:7]),
+                                    c("","",marforprob.phasecomp.M$sign[8:9]),
+                                    c("","","",marforprob.phasecomp.M$sign[10]))
+marforprob.phasecomp.M.z.ratio.sign = matrix(paste(marforprob.phasecomp.M.z.ratio, marforprob.phasecomp.M.sign, sep=""), ncol=4)
+write.table(marforprob.phasecomp.M.z.ratio.sign, 'clipboard', sep='\t')
+
+# males: (pre=chicks)>(eggs=post+=post-)
+pairs(marginal.emmeans.marforprob, by='breeding.phase')
+marforprob.sexcomp = pairs(marginal.emmeans.marforprob, by='breeding.phase')
+marforprob.sexcomp = as.data.frame(marforprob.sexcomp)
+marforprob.sexcomp$sign = ifelse(marforprob.sexcomp$p.value<0.001, "***",
+                              ifelse(marforprob.sexcomp$p.value<0.01, "**",
+                                   ifelse(marforprob.sexcomp$p.value<0.05, "*", "n.s.")))
+
+write.table(paste(round(marforprob.sexcomp$z.ratio, 2), marforprob.sexcomp$sign, sep=""), 'clipboard', sep='\t')
+# pre: females<males
+# eggs: females<males
+# chicks: females<males
+# post+: females<males
+# post-: females<males
+
+# HABITAT USE IN RELATION TO WITHIN-SEX BODY SIZE AND MASS:
+# PREPARATION FOR FIGURE 5: discussion figure about explanation for large variation in male marine foraging
+# does the probability to forage in marine habitat depend on bill, tarsus or body mass?
+bird.data <- read.csv("data/raw/bird.data.csv", header=T) # reload bird data is biometry has now been added
+bird.data$bill <- bird.data$headbill - bird.data$head
+prop.for.marine.biometrics = merge(gps.breeding.data.behav.marfor, bird.data[c(-12,-20),c('birdID','bodymass','bill','tarsus')], all.x=T)
+prop.for.marine.biometrics.females <- prop.for.marine.biometrics[prop.for.marine.biometrics$sex=='F',]
+prop.for.marine.biometrics.males <- prop.for.marine.biometrics[prop.for.marine.biometrics$sex=='M',]
+
+# analysis of bill length:
+prop.for.marine.bill.females <- prop.for.marine.biometrics.females[is.na(prop.for.marine.biometrics.females$bill)==F,]
+glmer.marforprob.females.bill <- glmer(foraging_marine~bill+(1|birdID)+(1|year), prop.for.marine.bill.females, family='binomial', na.action='na.fail', nAGQ=0)
+glmer.marforprob.females.nobill <- glmer(foraging_marine~1+(1|birdID)+(1|year), prop.for.marine.bill.females, family='binomial', na.action='na.fail', nAGQ=0)
+anova(glmer.marforprob.females.bill, glmer.marforprob.females.nobill)
+unique(prop.for.marine.bill.females$birdID)
+prop.for.marine.bill.males <- prop.for.marine.biometrics.males[is.na(prop.for.marine.biometrics.males$bill)==F,]
+glmer.marforprob.males.bill <- glmer(foraging_marine~bill+(1|birdID)+(1|year), prop.for.marine.bill.males, family='binomial', na.action='na.fail', nAGQ=0)
+glmer.marforprob.males.nobill <- glmer(foraging_marine~1+(1|birdID)+(1|year), prop.for.marine.bill.males, family='binomial', na.action='na.fail', nAGQ=0)
+anova(glmer.marforprob.males.bill, glmer.marforprob.males.nobill)
+unique(prop.for.marine.bill.males$birdID)
+
+# analysis of tarsus length:
+prop.for.marine.tarsus.females <- prop.for.marine.biometrics.females[is.na(prop.for.marine.biometrics.females$tarsus)==F,]
+glmer.marforprob.females.tarsus <- glmer(foraging_marine~tarsus+(1|birdID)+(1|year), prop.for.marine.tarsus.females, family='binomial', na.action='na.fail', nAGQ=0)
+glmer.marforprob.females.notarsus <- glmer(foraging_marine~1+(1|birdID)+(1|year), prop.for.marine.tarsus.females, family='binomial', na.action='na.fail', nAGQ=0)
+anova(glmer.marforprob.females.tarsus, glmer.marforprob.females.notarsus)
+unique(prop.for.marine.tarsus.females$birdID)
+
+prop.for.marine.tarsus.males <- prop.for.marine.biometrics.males[is.na(prop.for.marine.biometrics.males$tarsus)==F,]
+glmer.marforprob.males.tarsus <- glmer(foraging_marine~tarsus+(1|birdID)+(1|year), prop.for.marine.tarsus.males, family='binomial', na.action='na.fail', nAGQ=0)
+glmer.marforprob.males.notarsus <- glmer(foraging_marine~1+(1|birdID)+(1|year), prop.for.marine.tarsus.males, family='binomial', na.action='na.fail', nAGQ=0)
+anova(glmer.marforprob.males.tarsus, glmer.marforprob.males.notarsus)
+unique(prop.for.marine.tarsus.males$birdID)
+
+# for Figure 7, calculate the mean proportion of marine foraging per bird:
+birds_prop_for_marine <- aggregate(cbind(foraging,foraging_marine)~birdID+sex+bill+breeding.phase, prop.for.marine.biometrics[is.na(prop.for.marine.biometrics$bill)==F,], sum)
+birds_prop_for_marine$prop_for_marine <- birds_prop_for_marine$foraging_marine/birds_prop_for_marine$foraging
+birds_prop_for_marine[order(birds_prop_for_marine$birdID, birds_prop_for_marine$breeding.phase),] # 6068 foraged a lot in the freshwater Lauwersmeer during postbreeding, thereby changing the graph a little bit.
+birds_prop_for_marine <- aggregate(cbind(foraging,foraging_marine)~birdID+sex+bill, prop.for.marine.biometrics[is.na(prop.for.marine.biometrics$bill)==F,], sum)
+birds_prop_for_marine$prop_for_marine <- birds_prop_for_marine$foraging_marine/birds_prop_for_marine$foraging
+
+# PREPARATION FOR ANALYSIS ON TIMING OF NEST ATTENDANCE AND FORAGING
+
+### (4) TIMING OF NEST ATTENDANCE
+
+# check match between hour_CEST and diel_rad:
+unique(gps.breeding.data.behav.phase34[,c('hour_CEST','diel_rad')])
+
+# useful info online:
+# https://stats.stackexchange.com/questions/145527/model-selection-and-comparison-in-gamm-using-r-mgcv
+
+# using generalized additive mixed modelling
+bam.nest.attendance.full <- bam(at_nest~sexxbp+s(diel_rad, bs='cc', by=sexxbp)+s(tidal_stage_rad, bs='cc', by=sexxbp)+te(diel_rad, tidal_stage_rad, bs=c('cc','cc'), by=sexxbp)+s(birdID, bs='re')+s(year, bs='re'), data=gps.breeding.data.behav.phase34, family='binomial', method="ML") 
+
+bam.nest.attendance.without_4way_interaction <- bam(at_nest~sexxbp+s(diel_rad, bs='cc', by=sexxbp)+s(tidal_stage_rad, bs='cc', by=sexxbp)+te(diel_rad, tidal_stage_rad, bs=c('cc','cc'), by=sex)+te(diel_rad, tidal_stage_rad, bs=c('cc','cc'), by=breeding.phase)+s(birdID, bs='re')+s(year, bs='re'), data=gps.breeding.data.behav.phase34, family='binomial', method="ML")
+AIC(bam.nest.attendance.full, bam.nest.attendance.without_4way_interaction) # AIC increases by nearly 200 points when 4way interaction is removed. Therefore, full model is best-supported. 
+
+# Compare all 32 possible models (with in all models, the main effectsexxbp (i.e. the interaction between sex and breeding phase) kept in):
+# 4 models with one two-way interaction:
+bam.nest.bxt <- bam(at_nest~sexxbp+s(tidal_stage_rad, bs='cc', by=breeding.phase)+s(birdID, bs='re')+s(year, bs='re'), data=gps.breeding.data.behav.phase34, family='binomial', method="ML") #1
+# check that K=10 by default:
+bam.nest.bxt.K10 <- bam(at_nest~sexxbp+s(tidal_stage_rad, bs='cc', by=breeding.phase, k=10)+s(birdID, bs='re')+s(year, bs='re'), data=gps.breeding.data.behav.phase34, family='binomial', method="ML") #1
+bam.nest.bxt.K20 <- bam(at_nest~sexxbp+s(tidal_stage_rad, bs='cc', by=breeding.phase, k=20)+s(birdID, bs='re')+s(year, bs='re'), data=gps.breeding.data.behav.phase34, family='binomial', method="ML") #1
+bam.nest.bxt.K20.birdK20 <- bam(at_nest~sexxbp+s(tidal_stage_rad, bs='cc', by=breeding.phase, k=20)+s(birdID, bs='re', k=20)+s(year, bs='re'), data=gps.breeding.data.behav.phase34, family='binomial', method="ML") #1
+bam.nest.bxt.K20.birdK10 <- bam(at_nest~sexxbp+s(tidal_stage_rad, bs='cc', by=breeding.phase, k=20)+s(birdID, bs='re', k=10)+s(year, bs='re'), data=gps.breeding.data.behav.phase34, family='binomial', method="ML") #1
+AIC(bam.nest.bxt, bam.nest.bxt.K10, bam.nest.bxt.K20, bam.nest.bxt.K20.birdK20, bam.nest.bxt.K20.birdK10) # defining K for random effects seems not to do anything. This is not surprising, as no smoother should be involved for estimating the random effect.
+# The default indeed seems to be K=10. Check if this is also the case when there is a te smoother.
+bam.nest.bxd <- bam(at_nest~sexxbp+s(diel_rad, bs='cc', by=breeding.phase)+s(birdID, bs='re')+s(year, bs='re'), data=gps.breeding.data.behav.phase34, family='binomial', method="ML") #2
+bam.nest.sxt <- bam(at_nest~sexxbp+s(tidal_stage_rad, bs='cc', by=sex)+s(birdID, bs='re')+s(year, bs='re'), data=gps.breeding.data.behav.phase34, family='binomial', method="ML") #3
+bam.nest.sxd <- bam(at_nest~sexxbp+s(diel_rad, bs='cc', by=sex)+s(birdID, bs='re')+s(year, bs='re'), data=gps.breeding.data.behav.phase34, family='binomial', method="ML") #4
+# 6 models with two two-way interactions:
+bam.nest.bxt.bxd <- bam(at_nest~sexxbp+s(tidal_stage_rad, bs='cc', by=breeding.phase)+s(diel_rad, bs='cc', by=breeding.phase)+s(birdID, bs='re')+s(year, bs='re'), data=gps.breeding.data.behav.phase34, family='binomial', method="ML") #5
+bam.nest.bxt.sxt <- bam(at_nest~sexxbp+s(tidal_stage_rad, bs='cc', by=breeding.phase)+s(tidal_stage_rad, bs='cc', by=sex)+s(birdID, bs='re')+s(year, bs='re'), data=gps.breeding.data.behav.phase34, family='binomial', method="ML") #6
+bam.nest.bxt.sxd <- bam(at_nest~sexxbp+s(tidal_stage_rad, bs='cc', by=breeding.phase)+s(diel_rad, bs='cc', by=sex)+s(birdID, bs='re')+s(year, bs='re'), data=gps.breeding.data.behav.phase34, family='binomial', method="ML") #7
+bam.nest.bxd.sxt <- bam(at_nest~sexxbp+s(diel_rad, bs='cc', by=breeding.phase)+s(tidal_stage_rad, bs='cc', by=sex)+s(birdID, bs='re')+s(year, bs='re'), data=gps.breeding.data.behav.phase34, family='binomial', method="ML") #8
+bam.nest.bxd.sxd <- bam(at_nest~sexxbp+s(diel_rad, bs='cc', by=breeding.phase)+s(diel_rad, bs='cc', by=sex)+s(birdID, bs='re')+s(year, bs='re'), data=gps.breeding.data.behav.phase34, family='binomial', method="ML") #9
+bam.nest.sxt.sxd <- bam(at_nest~sexxbp+s(tidal_stage_rad, bs='cc', by=sex)+s(diel_rad, bs='cc', by=sex)+s(birdID, bs='re')+s(year, bs='re'), data=gps.breeding.data.behav.phase34, family='binomial', method="ML") #10
+# 4 models with 3-way interaction bxsxt (and two or more two-way interactions)
+bam.nest.bxsxt <- bam(at_nest~sexxbp+s(tidal_stage_rad, bs='cc', by=sexxbp)+s(birdID, bs='re')+s(year, bs='re'), data=gps.breeding.data.behav.phase34, family='binomial', method="ML") #11
+bam.nest.bxsxt.bxd <- bam(at_nest~sexxbp+s(tidal_stage_rad, bs='cc', by=sexxbp)+s(diel_rad, bs='cc', by=breeding.phase)+s(birdID, bs='re')+s(year, bs='re'), data=gps.breeding.data.behav.phase34, family='binomial', method="ML") #12
+bam.nest.bxsxt.sxd <- bam(at_nest~sexxbp+s(tidal_stage_rad, bs='cc', by=sexxbp)+s(diel_rad, bs='cc', by=sex)+s(birdID, bs='re')+s(year, bs='re'), data=gps.breeding.data.behav.phase34, family='binomial', method="ML") #13
+bam.nest.bxsxt.bxd.sxd <- bam(at_nest~sexxbp+s(tidal_stage_rad, bs='cc', by=sexxbp)+s(diel_rad, bs='cc', by=breeding.phase)+s(diel_rad, bs='cc', by=sex)+s(birdID, bs='re')+s(year, bs='re'), data=gps.breeding.data.behav.phase34, family='binomial', method="ML") #14
+# 4 models with 3-way interaction bxsxd (and two or more two-way interactions)
+bam.nest.bxsxd <- bam(at_nest~sexxbp+s(diel_rad, bs='cc', by=sexxbp)+s(birdID, bs='re')+s(year, bs='re'), data=gps.breeding.data.behav.phase34, family='binomial', method="ML") #15
+bam.nest.bxsxd.bxt <- bam(at_nest~sexxbp+s(diel_rad, bs='cc', by=sexxbp)+s(tidal_stage_rad, bs='cc', by=breeding.phase)+s(birdID, bs='re')+s(year, bs='re'), data=gps.breeding.data.behav.phase34, family='binomial', method="ML") #16
+bam.nest.bxsxd.sxt <- bam(at_nest~sexxbp+s(diel_rad, bs='cc', by=sexxbp)+s(tidal_stage_rad, bs='cc', by=sex)+s(birdID, bs='re')+s(year, bs='re'), data=gps.breeding.data.behav.phase34, family='binomial', method="ML") #17
+bam.nest.bxsxd.bxt.sxt <- bam(at_nest~sexxbp+s(diel_rad, bs='cc', by=sexxbp)+s(tidal_stage_rad, bs='cc', by=breeding.phase)+s(diel_rad, bs='cc', by=sex)+s(birdID, bs='re')+s(year, bs='re'), data=gps.breeding.data.behav.phase34, family='binomial', method="ML") #18
+# 4 models with 3-way interaction bxtxd
+bam.nest.bxtxd <- bam(at_nest~sexxbp+s(diel_rad, bs='cc', by=breeding.phase)+s(tidal_stage_rad, bs='cc', by=breeding.phase)+te(diel_rad, tidal_stage_rad, bs=c('cc','cc'), by=breeding.phase)+s(birdID, bs='re')+s(year, bs='re'), data=gps.breeding.data.behav.phase34, family='binomial', method="ML") #19
+
+# check the K=10 for the te smoother:
+bam.nest.bxtxd.teK10 <- bam(at_nest~sexxbp+s(diel_rad, bs='cc', by=breeding.phase)+s(tidal_stage_rad, bs='cc', by=breeding.phase)+te(diel_rad, tidal_stage_rad, bs=c('cc','cc'), by=breeding.phase, k=10)+s(birdID, bs='re')+s(year, bs='re'), data=gps.breeding.data.behav.phase34, family='binomial', method="ML")
+bam.nest.bxtxd.tideK10 <- bam(at_nest~sexxbp+s(diel_rad, bs='cc', by=breeding.phase)+s(tidal_stage_rad, bs='cc', by=breeding.phase, k=10)+te(diel_rad, tidal_stage_rad, bs=c('cc','cc'), by=breeding.phase)+s(birdID, bs='re')+s(year, bs='re'), data=gps.breeding.data.behav.phase34, family='binomial', method="ML")
+AIC(bam.nest.bxtxd, bam.nest.bxtxd.tideK10, bam.nest.bxtxd.teK10)
+
+bam.nest.bxtxd.sxt <- bam(at_nest~sexxbp+s(diel_rad, bs='cc', by=breeding.phase)+s(tidal_stage_rad, bs='cc', by=breeding.phase)+te(diel_rad, tidal_stage_rad, bs=c('cc','cc'), by=breeding.phase)+s(tidal_stage_rad, bs='cc', by=sex)+s(birdID, bs='re')+s(year, bs='re'), data=gps.breeding.data.behav.phase34, family='binomial', method="ML") #20
+bam.nest.bxtxd.sxd <- bam(at_nest~sexxbp+s(diel_rad, bs='cc', by=breeding.phase)+s(tidal_stage_rad, bs='cc', by=breeding.phase)+te(diel_rad, tidal_stage_rad, bs=c('cc','cc'), by=breeding.phase)+s(diel_rad, bs='cc', by=sex)+s(birdID, bs='re')+s(year, bs='re'), data=gps.breeding.data.behav.phase34, family='binomial', method="ML") #21
+bam.nest.bxtxd.sxt.sxd <- bam(at_nest~sexxbp+s(diel_rad, bs='cc', by=breeding.phase)+s(tidal_stage_rad, bs='cc', by=breeding.phase)+te(diel_rad, tidal_stage_rad, bs=c('cc','cc'), by=breeding.phase)+s(tidal_stage_rad, bs='cc', by=sex)+s(diel_rad, bs='cc', by=sex)+s(birdID, bs='re')+s(year, bs='re'), data=gps.breeding.data.behav.phase34, family='binomial', method="ML") #22
+# 4 models with 3-way interaction sxtxd
+bam.nest.sxtxd <- bam(at_nest~sexxbp+s(diel_rad, bs='cc', by=sex)+s(tidal_stage_rad, bs='cc', by=sex)+te(diel_rad, tidal_stage_rad, bs=c('cc','cc'), by=sex)+s(birdID, bs='re')+s(year, bs='re'), data=gps.breeding.data.behav.phase34, family='binomial', method="ML") #23
+bam.nest.sxtxd.bxt <- bam(at_nest~sexxbp+s(diel_rad, bs='cc', by=sex)+s(tidal_stage_rad, bs='cc', by=sex)+te(diel_rad, tidal_stage_rad, bs=c('cc','cc'), by=sex)+s(tidal_stage_rad, bs='cc', by=breeding.phase)+s(birdID, bs='re')+s(year, bs='re'), data=gps.breeding.data.behav.phase34, family='binomial', method="ML") #24
+bam.nest.sxtxd.bxd <- bam(at_nest~sexxbp+s(diel_rad, bs='cc', by=sex)+s(tidal_stage_rad, bs='cc', by=sex)+te(diel_rad, tidal_stage_rad, bs=c('cc','cc'), by=sex)+s(diel_rad, bs='cc', by=breeding.phase)+s(birdID, bs='re')+s(year, bs='re'), data=gps.breeding.data.behav.phase34, family='binomial', method="ML") #25
+bam.nest.sxtxd.bxt.bxd <- bam(at_nest~sexxbp+s(diel_rad, bs='cc', by=sex)+s(tidal_stage_rad, bs='cc', by=sex)+te(diel_rad, tidal_stage_rad, bs=c('cc','cc'), by=sex)+s(tidal_stage_rad, bs='cc', by=breeding.phase)+s(diel_rad, bs='cc', by=breeding.phase)+s(birdID, bs='re')+s(year, bs='re'), data=gps.breeding.data.behav.phase34, family='binomial', method="ML") #26
+# 4 models with two 3-way interactions (and all two-way interactions)
+bam.nest.bxsxt.bxsxd.bxtxd <- bam(at_nest~sexxbp+s(tidal_stage_rad, bs='cc', by=sexxbp)+s(diel_rad, bs='cc', by=sexxbp)+te(diel_rad, tidal_stage_rad, bs=c('cc','cc'), by=breeding.phase)+s(birdID, bs='re')+s(year, bs='re'), data=gps.breeding.data.behav.phase34, family='binomial', method="ML") #27
+bam.nest.bxsxt.bxsxd.sxtxd <- bam(at_nest~sexxbp+s(tidal_stage_rad, bs='cc', by=sexxbp)+s(diel_rad, bs='cc', by=sexxbp)+te(diel_rad, tidal_stage_rad, bs=c('cc','cc'), by=sex)+s(birdID, bs='re')+s(year, bs='re'), data=gps.breeding.data.behav.phase34, family='binomial', method="ML") #28
+bam.nest.bxsxt.bxtxd.sxtxd <- bam(at_nest~sexxbp+s(tidal_stage_rad, bs='cc', by=sexxbp)+s(diel_rad, bs='cc', by=breeding.phase)+s(diel_rad, bs='cc', by=sex)+te(diel_rad, tidal_stage_rad, bs=c('cc','cc'), by=breeding.phase)+te(diel_rad, tidal_stage_rad, bs=c('cc','cc'), by=sex)+s(birdID, bs='re')+s(year, bs='re'), data=gps.breeding.data.behav.phase34, family='binomial', method="ML") #29
+bam.nest.bxsxd.bxtxd.sxtxd <- bam(at_nest~sexxbp+s(diel_rad, bs='cc', by=sexxbp)+s(tidal_stage_rad, bs='cc', by=breeding.phase)+s(tidal_stage_rad, bs='cc', by=sex)+te(diel_rad, tidal_stage_rad, bs=c('cc','cc'), by=sex)+s(birdID, bs='re')+s(year, bs='re'), data=gps.breeding.data.behav.phase34, family='binomial', method="ML") #30
+# model with all four 3-way interactions:
+bam.nest.bxsxt.bxsxd.bxtxd.sxtxd <- bam(at_nest~sexxbp+s(diel_rad, bs='cc', by=sexxbp)+s(tidal_stage_rad, bs='cc', by=sexxbp)+te(diel_rad, tidal_stage_rad, bs=c('cc','cc'), by=breeding.phase)+te(diel_rad, tidal_stage_rad, bs=c('cc','cc'), by=sex)+s(birdID, bs='re')+s(year, bs='re'), data=gps.breeding.data.behav.phase34, family='binomial', method="ML") #31
+
+# 4-way model:
+bam.nest.bxsxdxt <- bam(at_nest~sexxbp+s(diel_rad, bs='cc', by=sexxbp)+s(tidal_stage_rad, bs='cc', by=sexxbp)+te(diel_rad, tidal_stage_rad, bs=c('cc','cc'), by=sexxbp)+s(birdID, bs='re')+s(year, bs='re'), data=gps.breeding.data.behav.phase34, family='binomial', method="ML") #32
+
+#rm(bam.nest.model.list)
+model.names <- ls()[grep("bam.nest",ls())]
+bam.nest.model.list <- mget(model.names)
+
+# retrieve deviance and AIC for each model
+AIC_deviance <- function(x) {
+  K = sum(x$edf)
+  aic_value = x$aic
+  aic_value_alt = AIC(x)
+  AICc_value = AICc(x)
+  round(c(K=K, AIC1=aic_value, AIC2=aic_value_alt, AICc=AICc_value),2)
 }
-# make first three cases manually outgoing:
-tidal.phase.hour$tidal_phase[1:3] <- "outgoing"
-gps.breeding.data.behav$date_hour_CEST <- round_date(gps.breeding.data.behav$date_time, "hour")
-gps.breeding.data.behav <- merge(gps.breeding.data.behav, tidal.phase.hour[,c('date_hour_CEST','tidal_phase')])
-  
-# nest attendance, without random effects:
-gps.breeding.data.behav.sel <- na.omit(gps.breeding.data.behav[gps.breeding.data.behav$breeding.phase.nr<5,c('birdID','date_time','hour_CEST','tidal_phase','breeding.phase','sex','at_nest','foraging','year')])
-gps.breeding.data.behav.sel$hour_f <- as.factor(gps.breeding.data.behav.sel$hour_CEST)
-m.nest.attendance.hour <- glm(at_nest~sex*breeding.phase+sex*tidal_phase*hour_f, gps.breeding.data.behav.sel, family='binomial', na.action='na.fail')
-#dredge(m.nest.attendance.hour) # takes ca. 5 minutes to run; full model is by far best supported (dAICc=80.92)
-summary(m.nest.attendance.hour)
-anova(m.nest.attendance.hour) # does not give p-values
-pairwise.comparison.nest.attendance.hour <- lsmeans(m.nest.attendance.hour, pairwise~sex*hour_f+sex*breeding.phase)
-pairwise.contrasts.nest.attendance.hour <- summary(pairwise.comparison.nest.attendance.hour$contrasts) # alles verschilt, behalve:
-pairwise.contrasts.nest.attendance.hour$p.value <- round(pairwise.contrasts.nest.attendance.hour$p.value,4)
-# F, eggs 0:00 versus 21:00, 22:00, 23:00, 1:00, 2:00
-# M, eggs 0:00 versus 23:00, 1:00, 2:00, 3:00
-data.predict <- expand.grid(breeding.phase=c("3.eggs","4.chicks"), hour=0:23, sex=c("F","M"), tidal_phase=c('low','incoming','high','outgoing'))
-data.predict$hour_f = as.factor(data.predict$hour)
-model.predictions <- predict(m.nest.attendance.hour, data.predict, se.fit=T)
-data.predict$logit.nest.attendance <- model.predictions$fit
-data.predict$logit.se.nest.attendance <- model.predictions$se.fit # mean +/- 1.96*se gives the CI
-# nest attendance in relation to hour of the day and sex, during low tide and during the egg phase
-data.predict.low.eggs <- data.predict[data.predict$tidal_phase=='low'&data.predict$breeding.phase=='3.eggs',]
-plot(logit.nest.attendance~hour, data.predict.low.eggs, col=c('red','blue')[as.numeric(data.predict.low.eggs$sex)]) # the known day night pattern of male and female egg incubation
-# nest attendance of females in relation to hour of the day and tidal phase during egg phase 
-plot(logit.nest.attendance~hour, data.predict[data.predict$sex=='F'&data.predict$breeding.phase=='3.eggs',], col=c('brown','green','blue','lightblue')[as.numeric(data.predict$tidal_phase[data.predict$sex=='F'&data.predict$breeding.phase=='3.eggs'])]) # females are more likely to attend the nest at high tide than at low tide, but primarily during the day until the late evening. Between midnight and early morning, there is no effect of tide and females are always on the nest. 
-plot(logit.nest.attendance~hour, data.predict[data.predict$sex=='M'&data.predict$breeding.phase=='3.eggs',], col=c('brown','green','blue','lightblue')[as.numeric(data.predict$tidal_phase[data.predict$sex=='M'&data.predict$breeding.phase=='3.eggs'])]) # for males, there is hardly any pattern with the tide, suggesting that when females are near the nest during high tide, at periods when they are normally not incubating, the males remain close to the nest too. Given the inaccuracy of the GPS measurement, it is uncertain who of the two partners is sitting on the nest during these periods, but field observations suggest that incubation shifts may occur during the day when females are present in the colony during high tide. 
+K_aic_values <- t(sapply(bam.nest.model.list,AIC_deviance))
+model_aic_df_nesting <- as.data.frame(model_aic_df_nesting)
+model_aic_df_nesting <- model_aic_df_nesting[order(model_aic_df_nesting$AICc),] # the full model is the best. 
+model_aic_df_nesting$Model <- substr(rownames(model_aic_df_nesting),10,40)
+model_aic_df_nesting$dAICc = round(model_aic_df_nesting$AICc-min(model_aic_df_nesting$AICc),2)
+write.csv(model_aic_df_nesting[,c('Model','K','dAICc')], "output/TableS2_modsel_nest_attendance_rhythm.csv")
+# AIC difference between top and 2nd model:
+model_aic_df_nesting$AICc[2]-model_aic_df_nesting$AICc[1]
 
-# these models already take quite a lot of time, even though we did not yet correct for pseudoreplication by adding individual as random effect. 
-# what happens when we calculate probabilities of nest attendance and foraging per bird, hour, tidal phase and breeding phase? (what about year?)
-mean.probs.per.bird.tidal.breeding.phase <- aggregate(cbind(at_nest, foraging)~birdID+sex+hour_CEST+hour_f+tidal_phase+breeding.phase, gps.breeding.data.behav.sel, mean)
-mean.probs.per.bird.tidal.breeding.phase$logit_at_nest <- qlogis(mean.probs.per.bird.tidal.breeding.phase$at_nest)
-mean.probs.per.bird.tidal.breeding.phase$logit_foraging <- qlogis(mean.probs.per.bird.tidal.breeding.phase$foraging)
-min_at_nest <- min(mean.probs.per.bird.tidal.breeding.phase$at_nest[mean.probs.per.bird.tidal.breeding.phase$at_nest>0])
-min_foraging <- min(mean.probs.per.bird.tidal.breeding.phase$foraging[mean.probs.per.bird.tidal.breeding.phase$foraging>0])
-max_at_nest <- max(mean.probs.per.bird.tidal.breeding.phase$at_nest[mean.probs.per.bird.tidal.breeding.phase$at_nest<1])
-max_foraging <- max(mean.probs.per.bird.tidal.breeding.phase$foraging[mean.probs.per.bird.tidal.breeding.phase$foraging<1])
-mean.probs.per.bird.tidal.breeding.phase$logit_at_nest[mean.probs.per.bird.tidal.breeding.phase$at_nest==0] <- qlogis(min_at_nest)
-mean.probs.per.bird.tidal.breeding.phase$logit_foraging[mean.probs.per.bird.tidal.breeding.phase$foraging==0] <- qlogis(min_foraging)
-mean.probs.per.bird.tidal.breeding.phase$logit_at_nest[mean.probs.per.bird.tidal.breeding.phase$at_nest==1] <- qlogis(max_at_nest)
-mean.probs.per.bird.tidal.breeding.phase$logit_foraging[mean.probs.per.bird.tidal.breeding.phase$foraging==1] <- qlogis(max_foraging)
-lm.nest.attendance <- lm(logit_at_nest~sex*breeding.phase+sex*tidal_phase*hour_f, data=mean.probs.per.bird.tidal.breeding.phase, na.action="na.fail")
-anova(lm.nest.attendance) # everything is significant, except the (near-significant) interaction between sex and breeding phase.
-dredge(lm.nest.attendance) # the hour x sex x tidal_phase interaction and the hour x tidal_phase interaction are no longer supported. Only limited support for the breeding phase x sex interaction.   
-# what does this do to predictions and confidence intervals?
-lm.predictions.nest.attendance <- predict(lm.nest.attendance, data.predict, se.fit=T)
-data.predict$lm.nest.attendance <- lm.predictions.nest.attendance$fit
-data.predict$lm.se.nest.attendance <- lm.predictions.nest.attendance$se.fit # mean +/- 1.96*se gives the CI
+### (5) TIMING OF FORAGING - also including the pre- and post-breeding phase! 
+bam.foraging.full <- bam(foraging~sexxbp+s(diel_rad, bs='cc', by=sexxbp)+s(tidal_stage_rad, bs='cc', by=sexxbp)+te(diel_rad, tidal_stage_rad, bs=c('cc','cc'), by=sexxbp)+s(birdID, bs='re')+s(year, bs='re'), data=gps.breeding.data.behav, family='binomial', method="ML")
+bam.foraging.without_4way_interaction <- bam(foraging~sexxbp+s(diel_rad, bs='cc', by=sexxbp)+s(tidal_stage_rad, bs='cc', by=sexxbp)+te(diel_rad, tidal_stage_rad, bs=c('cc','cc'), by=sex)+te(diel_rad, tidal_stage_rad, bs=c('cc','cc'), by=breeding.phase)+s(birdID, bs='re')+s(year, bs='re'), data=gps.breeding.data.behav, family='binomial', method="ML")
+AIC(bam.foraging.full, bam.foraging.without_4way_interaction) # AIC increases by nearly 400 points when 4way interaction is removed. Therefore, full model is best-supported. 
 
-data.predict.low.eggs <- data.predict[data.predict$tidal_phase=='low'&data.predict$breeding.phase=='3.eggs',]
-plot(lm.nest.attendance~hour, data.predict.low.eggs, col=c('red','blue')[as.numeric(data.predict.low.eggs$sex)]) # the known day night pattern of male and female egg incubation
-plot(logit.se.nest.attendance~lm.se.nest.attendance, data.predict) # the logit.se of the glm model on the raw data has about 3-7 times smaller SE's than the lm model on the means. However, in the glm, we should still account for the random effect. 
+# Compare all 32 possible models (with in all models, the main effectsexxbp (i.e. the interaction between sex and breeding phase) kept in):
+# 4 models with one two-way interaction:
+bam.foraging.bxt <- bam(foraging~sexxbp+s(tidal_stage_rad, bs='cc', by=breeding.phase)+s(birdID, bs='re')+s(year, bs='re'), data=gps.breeding.data.behav, family='binomial', method="ML") #1
+bam.foraging.bxd <- bam(foraging~sexxbp+s(diel_rad, bs='cc', by=breeding.phase)+s(birdID, bs='re')+s(year, bs='re'), data=gps.breeding.data.behav, family='binomial', method="ML") #2
+bam.foraging.sxt <- bam(foraging~sexxbp+s(tidal_stage_rad, bs='cc', by=sex)+s(birdID, bs='re')+s(year, bs='re'), data=gps.breeding.data.behav, family='binomial', method="ML") #3
+bam.foraging.sxd <- bam(foraging~sexxbp+s(diel_rad, bs='cc', by=sex)+s(birdID, bs='re')+s(year, bs='re'), data=gps.breeding.data.behav, family='binomial', method="ML") #4
+# 6 models with two two-way interactions:
+bam.foraging.bxt.bxd <- bam(foraging~sexxbp+s(tidal_stage_rad, bs='cc', by=breeding.phase)+s(diel_rad, bs='cc', by=breeding.phase)+s(birdID, bs='re')+s(year, bs='re'), data=gps.breeding.data.behav, family='binomial', method="ML") #5
+bam.foraging.bxt.sxt <- bam(foraging~sexxbp+s(tidal_stage_rad, bs='cc', by=breeding.phase)+s(tidal_stage_rad, bs='cc', by=sex)+s(birdID, bs='re')+s(year, bs='re'), data=gps.breeding.data.behav, family='binomial', method="ML") #6
+bam.foraging.bxt.sxd <- bam(foraging~sexxbp+s(tidal_stage_rad, bs='cc', by=breeding.phase)+s(diel_rad, bs='cc', by=sex)+s(birdID, bs='re')+s(year, bs='re'), data=gps.breeding.data.behav, family='binomial', method="ML") #7
+bam.foraging.bxd.sxt <- bam(foraging~sexxbp+s(diel_rad, bs='cc', by=breeding.phase)+s(tidal_stage_rad, bs='cc', by=sex)+s(birdID, bs='re')+s(year, bs='re'), data=gps.breeding.data.behav, family='binomial', method="ML") #8
+bam.foraging.bxd.sxd <- bam(foraging~sexxbp+s(diel_rad, bs='cc', by=breeding.phase)+s(diel_rad, bs='cc', by=sex)+s(birdID, bs='re')+s(year, bs='re'), data=gps.breeding.data.behav, family='binomial', method="ML") #9
+bam.foraging.sxt.sxd <- bam(foraging~sexxbp+s(tidal_stage_rad, bs='cc', by=sex)+s(diel_rad, bs='cc', by=sex)+s(birdID, bs='re')+s(year, bs='re'), data=gps.breeding.data.behav, family='binomial', method="ML") #10
 
-# compare the CI of the model based on raw data and model based on means per bird / hour / tidal phase / breeding stage
-# all data
-data.predict$prob.nest.attendance.all <- plogis(data.predict$logit.nest.attendance)  
-data.predict$prob.nest.attendance.all.lower <- plogis(data.predict$logit.nest.attendance-1.96*data.predict$logit.se.nest.attendance)  
-data.predict$prob.nest.attendance.all.upper <- plogis(data.predict$logit.nest.attendance+1.96*data.predict$logit.se.nest.attendance)  
-# mean data
-data.predict$prob.nest.attendance.means <- plogis(data.predict$lm.nest.attendance)  
-data.predict$prob.nest.attendance.means.lower <- plogis(data.predict$lm.nest.attendance-1.96*data.predict$lm.se.nest.attendance)  
-data.predict$prob.nest.attendance.means.upper <- plogis(data.predict$lm.nest.attendance+1.96*data.predict$lm.se.nest.attendance)  
-# plot the estimated CI for females during the egg phase during low tide:
-data.predict.eggs.females <- data.predict[data.predict$breeding.phase=='3.eggs'&data.predict$sex=="F",]
-data.predict.eggs.females.low <- data.predict.eggs.females[data.predict.eggs.females$tidal_phase=="low",]
-data.predict.eggs.females.incoming <- data.predict.eggs.females[data.predict.eggs.females$tidal_phase=="incoming",]
-data.predict.eggs.females.high <- data.predict.eggs.females[data.predict.eggs.females$tidal_phase=="high",]
-data.predict.eggs.females.outgoing <- data.predict.eggs.females[data.predict.eggs.females$tidal_phase=="outgoing",]
-plotCI(data.predict.eggs.females.low$hour, data.predict.eggs.females.low$prob.nest.attendance.all, li=data.predict.eggs.females.low$prob.nest.attendance.all.lower, ui=data.predict.eggs.females.low$prob.nest.attendance.all.upper, sfrac=0, gap=0, xlab="hour", ylab="probability of nest attendance", ylim=c(0,1), pch=19)
-plotCI(data.predict.eggs.females.low$hour+0.3, data.predict.eggs.females.low$prob.nest.attendance.means, li=data.predict.eggs.females.low$prob.nest.attendance.means.lower, ui=data.predict.eggs.females.low$prob.nest.attendance.means.upper, sfrac=0, gap=0, add=T, col="red", pch=19)
-# (as expected) wider CI's when based on means instead of raw data, however, still a clear day-night difference, at least during low tide. 
-data.predict.eggs.males <- data.predict[data.predict$breeding.phase=='3.eggs'&data.predict$sex=="M",]
-data.predict.eggs.males.low <- data.predict.eggs.males[data.predict.eggs.males$tidal_phase=="low",]
-data.predict.eggs.males.incoming <- data.predict.eggs.males[data.predict.eggs.males$tidal_phase=="incoming",]
-data.predict.eggs.males.high <- data.predict.eggs.males[data.predict.eggs.males$tidal_phase=="high",]
-data.predict.eggs.males.outgoing <- data.predict.eggs.males[data.predict.eggs.males$tidal_phase=="outgoing",]
+# 4 models with 3-way interaction bxsxt (and two or more two-way interactions)
+bam.foraging.bxsxt <- bam(foraging~sexxbp+s(tidal_stage_rad, bs='cc', by=sexxbp)+s(birdID, bs='re')+s(year, bs='re'), data=gps.breeding.data.behav, family='binomial', method="ML") #11
+bam.foraging.bxsxt.bxd <- bam(foraging~sexxbp+s(tidal_stage_rad, bs='cc', by=sexxbp)+s(diel_rad, bs='cc', by=breeding.phase)+s(birdID, bs='re')+s(year, bs='re'), data=gps.breeding.data.behav, family='binomial', method="ML") #12
+bam.foraging.bxsxt.sxd <- bam(foraging~sexxbp+s(tidal_stage_rad, bs='cc', by=sexxbp)+s(diel_rad, bs='cc', by=sex)+s(birdID, bs='re')+s(year, bs='re'), data=gps.breeding.data.behav, family='binomial', method="ML") #13
+bam.foraging.bxsxt.bxd.sxd <- bam(foraging~sexxbp+s(tidal_stage_rad, bs='cc', by=sexxbp)+s(diel_rad, bs='cc', by=breeding.phase)+s(diel_rad, bs='cc', by=sex)+s(birdID, bs='re')+s(year, bs='re'), data=gps.breeding.data.behav, family='binomial', method="ML") #14
 
-### Figure S3: nest attendance in reation to hour of the day and tidal phase for females and males
-windows(12,6)
-layout(matrix(1:2, ncol=2))
-par(mar=c(5,1,4,0), oma=c(0,3,0,7))
-### (A) females
-plotCI(data.predict.eggs.females.low$hour, data.predict.eggs.females.low$prob.nest.attendance.means, li=data.predict.eggs.females.low$prob.nest.attendance.means.lower, ui=data.predict.eggs.females.low$prob.nest.attendance.means.upper, sfrac=0, gap=0, xlab="hour", ylab="", col="red", pch=19, xlim=c(0,24), ylim=c(0,1), main="females")
-plotCI(data.predict.eggs.females.incoming$hour+0.2, data.predict.eggs.females.incoming$prob.nest.attendance.means, li=data.predict.eggs.females.incoming$prob.nest.attendance.means.lower, ui=data.predict.eggs.females.incoming$prob.nest.attendance.means.upper, sfrac=0, gap=0, col="green", pch=19, add=T)
-plotCI(data.predict.eggs.females.outgoing$hour+0.4, data.predict.eggs.females.outgoing$prob.nest.attendance.means, li=data.predict.eggs.females.outgoing$prob.nest.attendance.means.lower, ui=data.predict.eggs.females.outgoing$prob.nest.attendance.means.upper, sfrac=0, gap=0, col="orange", pch=19, add=T)
-plotCI(data.predict.eggs.females.high$hour+0.6, data.predict.eggs.females.high$prob.nest.attendance.means, li=data.predict.eggs.females.high$prob.nest.attendance.means.lower, ui=data.predict.eggs.females.high$prob.nest.attendance.means.upper, sfrac=0, gap=0, col="blue", pch=19, add=T)
-### (B) males
-plotCI(data.predict.eggs.males.low$hour, data.predict.eggs.males.low$prob.nest.attendance.means, li=data.predict.eggs.males.low$prob.nest.attendance.means.lower, ui=data.predict.eggs.males.low$prob.nest.attendance.means.upper, sfrac=0, gap=0, xlab="hour", ylab="", col="red", pch=19, xlim=c(0,24), ylim=c(0,1), yaxt="n", main="males")
-plotCI(data.predict.eggs.males.incoming$hour+0.2, data.predict.eggs.males.incoming$prob.nest.attendance.means, li=data.predict.eggs.males.incoming$prob.nest.attendance.means.lower, ui=data.predict.eggs.males.incoming$prob.nest.attendance.means.upper, sfrac=0, gap=0, col="green", pch=19, add=T)
-plotCI(data.predict.eggs.males.outgoing$hour+0.4, data.predict.eggs.males.outgoing$prob.nest.attendance.means, li=data.predict.eggs.males.outgoing$prob.nest.attendance.means.lower, ui=data.predict.eggs.males.outgoing$prob.nest.attendance.means.upper, sfrac=0, gap=0, col="orange", pch=19, add=T)
-plotCI(data.predict.eggs.males.high$hour+0.6, data.predict.eggs.males.high$prob.nest.attendance.means, li=data.predict.eggs.males.high$prob.nest.attendance.means.lower, ui=data.predict.eggs.males.high$prob.nest.attendance.means.upper, sfrac=0, gap=0, col="blue", pch=19, add=T)
-mtext("probability of nest attendance",2,1.5, outer=T)
-legend(26,0.247,c("low","incoming","high","outgoing"),pch=19, col=c("red","green","blue","orange"), xpd=NA)
+# 4 models with 3-way interaction bxsxd (and two or more two-way interactions)
+bam.foraging.bxsxd <- bam(foraging~sexxbp+s(diel_rad, bs='cc', by=sexxbp)+s(birdID, bs='re')+s(year, bs='re'), data=gps.breeding.data.behav, family='binomial', method="ML") #15
+bam.foraging.bxsxd.bxt <- bam(foraging~sexxbp+s(diel_rad, bs='cc', by=sexxbp)+s(tidal_stage_rad, bs='cc', by=breeding.phase)+s(birdID, bs='re')+s(year, bs='re'), data=gps.breeding.data.behav, family='binomial', method="ML") #16
+bam.foraging.bxsxd.sxt <- bam(foraging~sexxbp+s(diel_rad, bs='cc', by=sexxbp)+s(tidal_stage_rad, bs='cc', by=sex)+s(birdID, bs='re')+s(year, bs='re'), data=gps.breeding.data.behav, family='binomial', method="ML") #17
+bam.foraging.bxsxd.bxt.sxt <- bam(foraging~sexxbp+s(diel_rad, bs='cc', by=sexxbp)+s(tidal_stage_rad, bs='cc', by=breeding.phase)+s(diel_rad, bs='cc', by=sex)+s(birdID, bs='re')+s(year, bs='re'), data=gps.breeding.data.behav, family='binomial', method="ML") #18
 
-# analysing mean probabilities of nest attendance and foraging in relation to breeding phase and sex
-mean.probs.per.bird.breeding.phase <- aggregate(cbind(at_nest, foraging)~birdID+sex+breeding.phase, gps.breeding.data.behav.sel, mean)
-mean.probs.per.bird.breeding.phase$logit_at_nest <- qlogis(mean.probs.per.bird.breeding.phase$at_nest)
-mean.probs.per.bird.breeding.phase$logit_foraging <- qlogis(mean.probs.per.bird.breeding.phase$foraging)
-save.image("Time.allocation.results.tmp.RData")
-load("Time.allocation.results.tmp.RData")
+# 4 models with 3-way interaction bxtxd
+bam.foraging.bxtxd <- bam(foraging~sexxbp+s(diel_rad, bs='cc', by=breeding.phase)+s(tidal_stage_rad, bs='cc', by=breeding.phase)+te(diel_rad, tidal_stage_rad, bs=c('cc','cc'), by=breeding.phase)+s(birdID, bs='re')+s(year, bs='re'), data=gps.breeding.data.behav, family='binomial', method="ML") #19
+bam.foraging.bxtxd.sxt <- bam(foraging~sexxbp+s(diel_rad, bs='cc', by=breeding.phase)+s(tidal_stage_rad, bs='cc', by=breeding.phase)+te(diel_rad, tidal_stage_rad, bs=c('cc','cc'), by=breeding.phase)+s(tidal_stage_rad, bs='cc', by=sex)+s(birdID, bs='re')+s(year, bs='re'), data=gps.breeding.data.behav, family='binomial', method="ML") #20
+bam.foraging.bxtxd.sxd <- bam(foraging~sexxbp+s(diel_rad, bs='cc', by=breeding.phase)+s(tidal_stage_rad, bs='cc', by=breeding.phase)+te(diel_rad, tidal_stage_rad, bs=c('cc','cc'), by=breeding.phase)+s(diel_rad, bs='cc', by=sex)+s(birdID, bs='re')+s(year, bs='re'), data=gps.breeding.data.behav, family='binomial', method="ML") #21
+bam.foraging.bxtxd.sxt.sxd <- bam(foraging~sexxbp+s(diel_rad, bs='cc', by=breeding.phase)+s(tidal_stage_rad, bs='cc', by=breeding.phase)+te(diel_rad, tidal_stage_rad, bs=c('cc','cc'), by=breeding.phase)+s(tidal_stage_rad, bs='cc', by=sex)+s(diel_rad, bs='cc', by=sex)+s(birdID, bs='re')+s(year, bs='re'), data=gps.breeding.data.behav, family='binomial', method="ML") #22
 
-# Check how long the model takes when we add the random effect of individual (and year): 
-m.nest.attendance.rnd <- glmer(at_nest~sex*breeding.phase+sex*tidal_phase*hour_f+(1|birdID)+(1|year), gps.breeding.data.behav.sel, family='binomial', na.action='na.fail') # this model takes more than 8 hours to run... 
-save.image("Time.allocation.results.tmp.RData")
+# 4 models with 3-way interaction sxtxd
+bam.foraging.sxtxd <- bam(foraging~sexxbp+s(diel_rad, bs='cc', by=sex)+s(tidal_stage_rad, bs='cc', by=sex)+te(diel_rad, tidal_stage_rad, bs=c('cc','cc'), by=sex)+s(birdID, bs='re')+s(year, bs='re'), data=gps.breeding.data.behav, family='binomial', method="ML") #23
+bam.foraging.sxtxd.bxt <- bam(foraging~sexxbp+s(diel_rad, bs='cc', by=sex)+s(tidal_stage_rad, bs='cc', by=sex)+te(diel_rad, tidal_stage_rad, bs=c('cc','cc'), by=sex)+s(tidal_stage_rad, bs='cc', by=breeding.phase)+s(birdID, bs='re')+s(year, bs='re'), data=gps.breeding.data.behav, family='binomial', method="ML") #24
+bam.foraging.sxtxd.bxd <- bam(foraging~sexxbp+s(diel_rad, bs='cc', by=sex)+s(tidal_stage_rad, bs='cc', by=sex)+te(diel_rad, tidal_stage_rad, bs=c('cc','cc'), by=sex)+s(diel_rad, bs='cc', by=breeding.phase)+s(birdID, bs='re')+s(year, bs='re'), data=gps.breeding.data.behav, family='binomial', method="ML") #25
+bam.foraging.sxtxd.bxt.bxd <- bam(foraging~sexxbp+s(diel_rad, bs='cc', by=sex)+s(tidal_stage_rad, bs='cc', by=sex)+te(diel_rad, tidal_stage_rad, bs=c('cc','cc'), by=sex)+s(tidal_stage_rad, bs='cc', by=breeding.phase)+s(diel_rad, bs='cc', by=breeding.phase)+s(birdID, bs='re')+s(year, bs='re'), data=gps.breeding.data.behav, family='binomial', method="ML") #26
 
-### NOW the analysis of FORAGING
-glm.foraging <- glm(foraging~sex*breeding.phase+sex*tidal_phase*hour_f, gps.breeding.data.behav.sel, family='binomial', na.action='na.fail')
-dredge(glm.foraging) # takes ca. 5 minutes to run; full model is by far best supported (dAICc=80.92)
-model.predictions.foraging <- predict(glm.foraging, data.predict, se.fit=T)
-data.predict$logit.foraging <- model.predictions.foraging$fit
-data.predict$logit.se.foraging <- model.predictions.foraging$se.fit # mean +/- 1.96*se gives the CI
-plot(logit.foraging~hour, data.predict[data.predict$tidal_phase=='low'&data.predict$breeding.phase=='3.eggs',], col=c('red','blue')[as.numeric(data.predict$sex[data.predict$tidal_phase=='low'&data.predict$breeding.phase=='3.eggs'])])
-plot(logit.foraging~hour, data.predict[data.predict$sex=='F'&data.predict$breeding.phase=='3.eggs',], col=c('brown','green','blue','lightblue')[as.numeric(data.predict$tidal_phase[data.predict$sex=='F'&data.predict$breeding.phase=='3.eggs'])]) 
-plot(logit.foraging~hour, data.predict[data.predict$sex=='M'&data.predict$breeding.phase=='3.eggs',], col=c('brown','green','blue','lightblue')[as.numeric(data.predict$tidal_phase[data.predict$sex=='M'&data.predict$breeding.phase=='3.eggs'])]) 
+# 4 models with two 3-way interactions (and all two-way interactions)
+bam.foraging.bxsxt.bxsxd.bxtxd <- bam(foraging~sexxbp+s(tidal_stage_rad, bs='cc', by=sexxbp)+s(diel_rad, bs='cc', by=sexxbp)+te(diel_rad, tidal_stage_rad, bs=c('cc','cc'), by=breeding.phase)+s(birdID, bs='re')+s(year, bs='re'), data=gps.breeding.data.behav, family='binomial', method="ML") #27
+bam.foraging.bxsxt.bxsxd.sxtxd <- bam(foraging~sexxbp+s(tidal_stage_rad, bs='cc', by=sexxbp)+s(diel_rad, bs='cc', by=sexxbp)+te(diel_rad, tidal_stage_rad, bs=c('cc','cc'), by=sex)+s(birdID, bs='re')+s(year, bs='re'), data=gps.breeding.data.behav, family='binomial', method="ML") #28
+bam.foraging.bxsxt.bxtxd.sxtxd <- bam(foraging~sexxbp+s(tidal_stage_rad, bs='cc', by=sexxbp)+s(diel_rad, bs='cc', by=breeding.phase)+s(diel_rad, bs='cc', by=sex)+te(diel_rad, tidal_stage_rad, bs=c('cc','cc'), by=breeding.phase)+te(diel_rad, tidal_stage_rad, bs=c('cc','cc'), by=sex)+s(birdID, bs='re')+s(year, bs='re'), data=gps.breeding.data.behav, family='binomial', method="ML") #29
+bam.foraging.bxsxd.bxtxd.sxtxd <- bam(foraging~sexxbp+s(diel_rad, bs='cc', by=sexxbp)+s(tidal_stage_rad, bs='cc', by=breeding.phase)+s(tidal_stage_rad, bs='cc', by=sex)+te(diel_rad, tidal_stage_rad, bs=c('cc','cc'), by=sex)+s(birdID, bs='re')+s(year, bs='re'), data=gps.breeding.data.behav, family='binomial', method="ML") #30
+
+# model with all four 3-way interactions:
+bam.foraging.bxsxt.bxsxd.bxtxd.sxtxd <- bam(foraging~sexxbp+s(diel_rad, bs='cc', by=sexxbp)+s(tidal_stage_rad, bs='cc', by=sexxbp)+te(diel_rad, tidal_stage_rad, bs=c('cc','cc'), by=breeding.phase)+te(diel_rad, tidal_stage_rad, bs=c('cc','cc'), by=sex)+s(birdID, bs='re')+s(year, bs='re'), data=gps.breeding.data.behav, family='binomial', method="ML") #31
+
+# 4-way model:
+bam.foraging.bxsxdxt <- bam(foraging~sexxbp+s(diel_rad, bs='cc', by=sexxbp)+s(tidal_stage_rad, bs='cc', by=sexxbp)+te(diel_rad, tidal_stage_rad, bs=c('cc','cc'), by=sexxbp)+s(birdID, bs='re')+s(year, bs='re'), data=gps.breeding.data.behav, family='binomial', method="ML") #32
+
+# run the full 4-way model with more degrees of freedom for the smoothers:
+
+rm(model.names.bam.foraging, bam_foraging_aic_df)
+model.names.bam.foraging <- ls()[grep("bam.foraging",ls())]
+bam.model.list.foraging <- mget(model.names.bam.foraging)
+
+model_aic_df_foraging <- as.data.frame(t(sapply(bam.model.list.foraging,AIC_deviance)))
+model_aic_df_foraging <- model_aic_df_foraging[order(model_aic_df_foraging$AICc),] # the full model is the best. 
+model_aic_df_foraging$Model <- substr(rownames(model_aic_df_foraging),10,40)
+model_aic_df_foraging$dAICc = round(model_aic_df_foraging$AICc-min(model_aic_df_foraging$AICc),2)
+model_aic_df_foraging # model 2 and 3 are exactly the same in terms of K and AIC1 (but not in AIC2 and AICc as these are corrected in some way...)
+model_aic_df_foraging <- model_aic_df_foraging[-2,] # remove the 2nd model
+model_aic_df_foraging$Model <- substr(model_aic_df_foraging$Model,5,40)
+write.csv(model_aic_df_foraging[,c('Model','K','dAICc')], "output/TableS3_modsel_foraging_rhythm.csv")
+# AIC difference between top and 2nd model:
+model_aic_df_nesting$AICc[2]-model_aic_df_nesting$AICc[1]
+
+# check convergence of complex models:
+bam.foraging.bxsxdxt$converged
+bam.foraging.bxsxt.bxsxd.bxtxd.sxtxd$converged
+
+# run best-supported models with REML estimation:
+bam.nest.bxsxdxt.REML <- bam(at_nest~sexxbp+s(diel_rad, bs='cc', by=sexxbp)+s(tidal_stage_rad, bs='cc', by=sexxbp)+te(diel_rad, tidal_stage_rad, bs=c('cc','cc'), by=sexxbp)+s(birdID, bs='re')+s(year, bs='re'), data=gps.breeding.data.behav.phase34, family='binomial', method="REML") #32
+bam.foraging.bxsxdxt.REML <- bam(foraging~sexxbp+s(diel_rad, bs='cc', by=sexxbp)+s(tidal_stage_rad, bs='cc', by=sexxbp)+te(diel_rad, tidal_stage_rad, bs=c('cc','cc'), by=sexxbp)+s(birdID, bs='re')+s(year, bs='re'), data=gps.breeding.data.behav, family='binomial', method="REML") #32
+
+bam.foraging.bxsxdxt.REML <- bam(foraging~sexxbp+s(diel_rad, bs='cc', by=sexxbp)+s(tidal_stage_rad, bs='cc', by=sexxbp)+te(diel_rad, tidal_stage_rad, bs=c('cc','cc'), by=sexxbp)+s(birdID, bs='re')+s(year, bs='re'), data=gps.breeding.data.behav, family='binomial', method="REML") #32
+bam.foraging.full.k10.REML <- bam(foraging~sexxbp+s(diel_rad, bs='cc', by=sexxbp, k=10)+s(tidal_stage_rad, bs='cc', by=sexxbp, k=10)+te(diel_rad, tidal_stage_rad, bs=c('cc','cc'), by=sexxbp, k=10)+s(birdID, bs='re')+s(year, bs='re'), data=gps.breeding.data.behav, family='binomial', method="REML")
+
+
+save.image("data/tmp/time.allocation.results.20240206.RData")

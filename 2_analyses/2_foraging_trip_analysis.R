@@ -1,5 +1,5 @@
 # first run the time allocation analysis script
-keep(gps.breeding.data.behav, duration_yday_birdID_year, bird.data, breeding.data, sure=T)
+#keep(gps.breeding.data.behav, bird.data, breeding.data, sure=T)
 
 source("functions.R") # to have the most updated version of the functions
 Sys.setenv(TZ='Europe/Amsterdam') # just to be sure
@@ -10,7 +10,7 @@ gps.breeding.data.behav$at_colony_50m[gps.breeding.data.behav$distance.to.nest<5
 
 gps.breeding.data.behav$foraging_trip = 0
 
-### Determine and label individual foraging trips  (takes about 5 minutes to calculate)
+### Determine and label individual foraging trips
 ### Important that the data is ordered correctly, on year, bird, date
 gps.breeding.data.behav <- gps.breeding.data.behav[order(gps.breeding.data.behav$year, gps.breeding.data.behav$birdID, gps.breeding.data.behav$date_time),]
 
@@ -39,6 +39,7 @@ for(bird in unique(gps.breeding.data.behav$birdID)) {
     gps.breeding.data.behav$foraging_trip[gps.breeding.data.behav$birdID==bird&gps.breeding.data.behav$year==year] = df.tmp$foraging_trip  
     }
 }
+# until now, foraging trips are defined on the basis of leaving the colony, not yet by the fact that birds were also foraging for some time when away from the colony. This is defined below. 
 
 gps.breeding.data.behav$year = as.factor(gps.breeding.data.behav$year)
 
@@ -52,57 +53,69 @@ table(df.for.trips.34$habitat[df.for.trips.34$behaviour=='foraging'])
 # however, birds, and particularly males, often make short trips on the saltmarsh to search for nestmaterial. 
 table(df.for.trips.34$habitat[df.for.trips.34$foraging==1]) # however, in the time allocation analysis script, we used the criterium that we assumed a bird was foraging when it was estimated to be foraging on the basis of acc data AND was located in foraging habitat (water)
 
-df.for.trips.34$duration_foraging_freshwater = df.for.trips.34$duration_foraging - df.for.trips.34$duration_foraging_marine
+df.for.trips.34$foraging_freshwater = df.for.trips.34$foraging - df.for.trips.34$foraging_marine
 # duration presence on the mainland:
-df.for.trips.34$duration_mainland = ifelse(df.for.trips.34$habitat_type=='mainland',df.for.trips.34$duration_behav/60,0)
+df.for.trips.34$on_mainland = ifelse(df.for.trips.34$habitat_type=='mainland',1,0)
 
 max.distance.year.bird.trip = aggregate(distance.to.nest/1000 ~ year + birdID + foraging_trip, data=df.for.trips.34, max) 
 names(max.distance.year.bird.trip)[4]<-'distance.to.nest'
-dur.foraging.per.trip = aggregate(cbind(duration_foraging/60, duration_foraging_marine/60, duration_foraging_freshwater/60, duration_mainland/60)~year+birdID+foraging_trip, data=df.for.trips.34, sum) # breeding phase is removed, as a foraging trip can cover the switch from egg to chick phase, or from chick to postfledging... Later, the breeding phases will be coupled again.  
-names(dur.foraging.per.trip)[4:7] <- c('duration_foraging', 'duration_foraging_marine', 'duration_foraging_freshwater', 'duration_mainland')
+df.for.trips.34$freq=1
+foraging.sums.per.trip = aggregate(cbind(freq, foraging, foraging_marine, foraging_freshwater, on_mainland)~year+birdID+foraging_trip, data=df.for.trips.34, sum) # breeding phase is removed, as a foraging trip can cover the switch from egg to chick phase, or from chick to postfledging... Later, the breeding phases will be coupled again. Here, the info on whether a bird was actually foraging is calculated. 
 start_time_of_trips = aggregate(date_time~year+birdID+foraging_trip, data=df.for.trips.34, min) # we assume the trip starts at the first location outside the colony, because otherwise (if 0.5*time_to_previous is substracted) the start of the trip sometimes ends up in a yday that is excluded from analysis because it has less than 23.5 hours of duration data.  
 names(start_time_of_trips)[4] = 'start_time'
 # other info at the start of the foraging trip:
-other_start_info_trips = aggregate(cbind(day_rel_hatching, week_rel_hatching, week, yday_CEST)~year+birdID+foraging_trip, data=df.for.trips.34, min) # we assume 
-end_time_of_trips = aggregate(date_time+time_to_next~year+birdID+foraging_trip, data=df.for.trips.34, max) # we assume the trip ends at the first location back in the colony after a trip. 
+#other_start_info_trips = aggregate(yday_CEST~year+birdID+foraging_trip, data=df.for.trips.34, min) # we assume 
+end_time_of_trips = aggregate(date_time~year+birdID+foraging_trip, data=df.for.trips.34, max) # we assume the trip ends at the last sample outside the colony. We then add 30 minutes, to account for the fact that on average, the individual departed 15 minutes prior to the first sample outside the colony and returned on average 15 minutes after the last sample outside the colony.  
 names(end_time_of_trips)[4] = 'end_time'
 trips.start.end <- cbind(start_time_of_trips, end_time=end_time_of_trips$end_time)
 trips.start.end$yday_start <- yday(trips.start.end$start_time)
 trips.start.end$yday_end <- yday(trips.start.end$end_time)
-trips.start.end$trip.duration <- difftime(trips.start.end$end_time, trips.start.end$start_time, units="hour")
+trips.start.end$trip.duration <- round(difftime(trips.start.end$end_time, trips.start.end$start_time, units="hour"),2)+0.5 # we add 30 minutes (=0.5 h), see above
 # check that aggregate functions were done in the same order:
-table(trips.start.end$birdID==dur.foraging.per.trip$birdID)
+table(trips.start.end$birdID==foraging.sums.per.trip$birdID)
 table(trips.start.end$birdID==max.distance.year.bird.trip$birdID)
-table(trips.start.end$birdID==other_start_info_trips$birdID)
-trip.info <- cbind(trips.start.end, other_start_info_trips[,c('day_rel_hatching','week_rel_hatching','week')], dur.foraging.per.trip[,c('duration_foraging', 'duration_foraging_marine', 'duration_foraging_freshwater', 'duration_mainland')], distance.to.nest=max.distance.year.bird.trip$distance.to.nest)
-## only keep foraging trips that (1) took place within a single day or (2) if the trip covered more than one day, only trips where the day after the start date of the trip is not missing (because the bird went outside the study area for example, or because it included durations of >60 minutes): 
-duration_yday_birdID_year <- duration_yday_birdID_year[order(duration_yday_birdID_year$year, duration_yday_birdID_year$birdID, duration_yday_birdID_year$yday_CEST),]
-duration_yday_birdID_year$next.day.missing <- 0
-for (i in 2:dim(duration_yday_birdID_year)[1]) if (duration_yday_birdID_year$yday_CEST[i]!=(duration_yday_birdID_year$yday_CEST[i-1]+1)) duration_yday_birdID_year$next.day.missing[i-1] <- 1
-trip.info.sel <- merge(trip.info, duration_yday_birdID_year[c('year','birdID','yday_CEST','dur_per_yday','next.day.missing')], by.x=c('year','birdID','yday_start'), by.y=c('year','birdID','yday_CEST'), all.x=T)
-trip.info.sel$end.trip.next.day <- ifelse(trip.info.sel$yday_end>trip.info.sel$yday_start,1,0)
-# exclude trips that ended on a later date than the start date and where the date after the start date was excluded (because <23.5 hour data):
-trip.info.sel <- trip.info.sel[trip.info.sel$end.trip.next.day==0|(trip.info.sel$end.trip.next.day==1&trip.info.sel$next.day.missing==0),]
-dim(trips.start.end)[1]-dim(trip.info.sel)[1] # 96 trips excluded
-table(round(as.numeric(trip.info.sel$trip.duration),1)) # what to do with the few trips that covered more than 24 hours (12 out of the 5989 trips)? Only for the trips that were >48 hours, this could possibly be caused by the day after the next day to be missing in the dataset.
-# therefore, I excluded the 3 trips that were longer than 48 hours:
-trip.info.sel <- trip.info.sel[trip.info.sel$trip.duration<48,]
+#table(trips.start.end$birdID==other_start_info_trips$birdID)
+#trip.info <- cbind(trips.start.end, other_start_info_trips[,c('day_rel_hatching','week_rel_hatching','week')], foraging.sums.per.trip[,c('freq','foraging', 'foraging_marine', 'foraging_freshwater', 'on_mainland')], distance.to.nest=max.distance.year.bird.trip$distance.to.nest)
+#trip.info <- merge(merge(merge(trips.start.end, other_start_info_trips[,c('foraging_trip','day_rel_hatching','week_rel_hatching','week')]), foraging.sums.per.trip[,c('foraging_trip','freq','foraging', 'foraging_marine', 'foraging_freshwater', 'on_mainland')]), max.distance.year.bird.trip[,c('foraging_trip','distance.to.nest')]) # should produce the same, but takes much longer...
+trip.info <- cbind(trips.start.end, foraging.sums.per.trip[,c('freq','foraging', 'foraging_marine', 'foraging_freshwater', 'on_mainland')], distance.to.nest=max.distance.year.bird.trip$distance.to.nest)
 
-dim(trip.info.sel[trip.info.sel$duration_foraging==0,]) ## in 2883 of the 6085 trips, birds were not (registered to be) foraging.
-trip.info.sel <- trip.info.sel[trip.info.sel$duration_foraging>0,]
-dim(trip.info.sel) # N=3103 trips left
-# merge with duration_yday_birdID_year to add sex and breeding.phase again
-df.for.trips = merge(trip.info.sel, duration_yday_birdID_year[,c('year','birdID','yday_CEST','sex','breeding.phase.nr','breeding.phase')], by.x=c('year','birdID','yday_start'), by.y=c('year','birdID','yday_CEST'))
+## only use trips where the bird was actually foraging for some time:
+trip.info.sel <- trip.info[trip.info$foraging>0,] # 3160 trips left from 4295
+## only keep foraging trips that (1) took place within a single day or (2) if the trip covered more than one day, only trips where the day after the start date of the trip is not missing (because the bird went outside the study area for example, or because it included durations of >60 minutes): 
+gps.breeding.data.behav$freq=1
+complete_birdyeardays <- aggregate(freq~birdID+yday_CEST+year+breeding.phase+breeding.phase.nr+sex, gps.breeding.data.behav, sum)
+table(complete_birdyeardays$freq)
+complete_birdyeardays <- complete_birdyeardays[order(complete_birdyeardays$year, complete_birdyeardays$birdID, complete_birdyeardays$yday_CEST),]
+complete_birdyeardays$next.day.missing <- 0
+for (i in 2:dim(complete_birdyeardays)[1]) if (complete_birdyeardays$yday_CEST[i]!=(complete_birdyeardays$yday_CEST[i-1]+1)) complete_birdyeardays$next.day.missing[i-1] <- 1
+trip.info.sel2 <- merge(trip.info.sel, complete_birdyeardays[c('year','birdID','yday_CEST','sex','breeding.phase.nr','breeding.phase','next.day.missing')], by.x=c('year','birdID','yday_start'), by.y=c('year','birdID','yday_CEST'))
+trip.info.sel2$end.trip.next.day <- ifelse(trip.info.sel2$yday_end>trip.info.sel2$yday_start,1,0)
+# exclude trips that ended on a later date than the start date and where the date after the start date was excluded (because less than 47 samples):
+trip.info.sel2 <- trip.info.sel2[trip.info.sel2$end.trip.next.day==0|(trip.info.sel2$end.trip.next.day==1&trip.info.sel2$next.day.missing==0),]
+dim(trip.info.sel)[1]-dim(trip.info.sel2)[1] # 40 trips excluded because of incomplete data on the day itself or the day after.
+
+table(round(as.numeric(trip.info.sel2$trip.duration),1)) # what to do with the few trips that covered more than 24 hours (17 out of the 3120 trips)? 
+# Only for the trips that were >48 hours, this could possibly be caused by the day after the next day to be missing in the dataset. Check if this was the case:
+na.omit(trip.info.sel2[trip.info.sel2$trip.duration>48,])
+
+complete_birdyeardays[complete_birdyeardays$birdID==1606 & complete_birdyeardays$year==2015 & complete_birdyeardays$yday_CEST%in%c(162:165),]
+complete_birdyeardays[complete_birdyeardays$birdID==651 & complete_birdyeardays$yday_CEST%in%c(170:173),]
+complete_birdyeardays[complete_birdyeardays$birdID==6287 & complete_birdyeardays$year==2017 & complete_birdyeardays$yday_CEST%in%c(185:195),]
+# in all cases, it concerns the end of the chick phase, when chicks are already very large
+
+dim(trip.info.sel2) # N=3120 trips left
+df.for.trips <- trip.info.sel2
+df.for.trips$breeding.phase <- factor(df.for.trips$breeding.phase)
 df.for.trips$trip.duration <- as.numeric(df.for.trips$trip.duration)
 
 # calculate proportion of marine vs freshwater foraging during foraging trip:
-df.for.trips$prop_foraging_marine <- df.for.trips$duration_foraging_marine/df.for.trips$duration_foraging
-df.for.trips$prop_foraging_freshwater <- df.for.trips$duration_foraging_freshwater/df.for.trips$duration_foraging
+df.for.trips$prop_foraging_marine <- df.for.trips$foraging_marine/df.for.trips$foraging
+df.for.trips$prop_foraging_freshwater <- df.for.trips$foraging_freshwater/df.for.trips$foraging
 df.for.trips$marine.trip <- ifelse(df.for.trips$prop_foraging_marine>0.5,1,0)
 
 # assess the proportion of foraging in marine/brackish and freshwater foraging trips: 
 windows()
-hist(df.for.trips$prop_foraging_marine, breaks=20, xlab='prop foraging marine', main='Distribution of proportion marine per foraging trip', ylim=c(0,2500)) # shows mainly
+hist(df.for.trips$prop_foraging_marine, breaks=20, xlab='proportion of foraging marine', ylab="total number of trips", ylim=c(0,2500), main="") # shows mainly
 windows()
 hist(df.for.trips$prop_foraging_fresh, breaks=20, xlab='prop foraging freshwater', main='Distribution of proportion freshwater per foraging trip', ylim=c(0,2500)) # this is now logically exactly the opposite pattern as that of prop marine foraging. (as brackish foraging is pooled with marine foraging)
 
@@ -110,7 +123,7 @@ df.for.trips$hour_end = hour(df.for.trips$end_time)
 df.for.trips$yday_start = yday(df.for.trips$start_time)
 df.for.trips$yday_end = yday(df.for.trips$end_time)
 df.for.trips$year = as.factor(df.for.trips$year)
-df.for.trips$prop_foraging <- df.for.trips$duration_foraging/df.for.trips$trip.duration
+df.for.trips$prop_foraging <- df.for.trips$foraging/df.for.trips$freq
 
 # plot the distribution of foraging trip distances for females and males:
 windows()
@@ -137,22 +150,19 @@ n_trips_day_bird_year_zeros$freq[is.na(n_trips_day_bird_year_zeros$freq)]=0
 names(n_trips_day_bird_year_zeros)[7]='n_trips'
 
 # using the number of foraging trips per date per bird as statistical unit
-var(n_trips_day_bird_year_zeros$n_trips)/mean(n_trips_day_bird_year_zeros$n_trips) # 0.75, no overdispersion. 
+var(n_trips_day_bird_year_zeros$n_trips)/mean(n_trips_day_bird_year_zeros$n_trips) # 0.58, no overdispersion. 
 hist(n_trips_day_bird_year_zeros$n_trips, breaks=8)
-m_n_for_trips_rnd_bird_within_year  = glmer(n_trips~breeding.phase*sex+(1|year/birdID), data=n_trips_day_bird_year_zeros, family="poisson", na.action='na.fail') # warning of singularity of fit; probably due to some birds having data in only one year
-m_n_for_trips_rnd_bird  = glmer(n_trips~breeding.phase*sex+(1|birdID), data=n_trips_day_bird_year_zeros, family="poisson", na.action='na.fail')
-m_n_for_trips_rnd_bird_year  = glmer(n_trips~breeding.phase*sex+(1|birdID)+(1|year), data=n_trips_day_bird_year_zeros, family="poisson", na.action='na.fail')
-AIC(m_n_for_trips, m_n_for_trips_rnd_bird, m_n_for_trips_rnd_bird_year) # additive random effects of bird and year is best supported, though the model with only bird as a random effect is the most parsimonious.
+m_n_for_trips  = glmer(n_trips~breeding.phase*sex+(1|birdID)+(1|year), data=n_trips_day_bird_year_zeros, family="poisson", na.action='na.fail') # cross random effects of year and bird
 summary(m_n_for_trips)
-m_n_for_trips  = glmer(n_trips~breeding.phase*sex+(1|birdID)+(1|year), data=n_trips_day_bird_year_zeros, family="poisson", na.action='na.fail') # use model with birdID and year as random intercepts in an additive rather than nested structure
-summary(m_n_for_trips)
-n_parameters(m_n_for_trips, effects='fixed')
-n_parameters(m_n_for_trips, effects='random')
 
 model.sel.n.trips = dredge(m_n_for_trips) # most parsimonious model includes additive effect of sex and breeding phase
 m.pars.n.trips = get.models(model.sel.n.trips,1)[[1]]
-emmeans.n.trips <- emmeans(m.pars.n.trips, pairwise~breeding.phase*sex, transform='response')
+emmeans.n.trips <- emmeans(m_n_for_trips, pairwise~breeding.phase*sex, regrid='response')
 emmeans.n.trips$contrasts # all pairwise comparisons are significant, except eggs F vs chicks M. 
+n.trips.pairs = as.data.frame(emmeans.n.trips$contrasts)[c(2,5,1,6),]
+n.trips.pairs$sign = ifelse(n.trips.pairs$p.value<0.001, "***",
+                            ifelse(n.trips.pairs$p.value<0.01, "**",
+                                   ifelse(n.trips.pairs$p.value<0.05, "*", "n.s.")))
 as.data.frame(emmeans.n.trips$emmeans)
 # Females increase the number of trips more than males when chicks have hatched. 
 
@@ -177,7 +187,11 @@ model.sel.for.trip.dur.gamma = dredge(m_for.trip.dur.gamma) # interaction betwee
 m.pars.for.trip.dur = get.models(model.sel.for.trip.dur.gamma,1)[[1]]
 summary(m.pars.for.trip.dur)
 emmeans.for.trip.dur <- emmeans(m.pars.for.trip.dur, pairwise~breeding.phase*sex, type='response')
-emmeans.for.trip.dur # all pairwise comparisons are significant, except eggs M vs chicks M (and eggs F vs eggs/chicks M). 
+emmeans.for.trip.dur # all pairwise comparisons are significant, except eggs M vs chicks M and eggs F vs eggs/chicks M). 
+dur.trips.pairs = as.data.frame(emmeans.for.trip.dur$contrasts)[c(2,5,1,6),]
+dur.trips.pairs$sign = ifelse(dur.trips.pairs$p.value<0.001, "***",
+                            ifelse(dur.trips.pairs$p.value<0.01, "**",
+                                   ifelse(dur.trips.pairs$p.value<0.05, "*", "n.s.")))
 
 ### (3) FORAGING TRIP DISTANCE
 
@@ -204,59 +218,15 @@ plot(residuals(m_for_trip_dist.gamma)~predict(m_for_trip_dist.gamma)) # nicely h
 boxplot(residuals(m_for_trip_dist.gamma)~paste(df.for.trips$sex, df.for.trips$breeding.phase))
 model.sel.for.trip.distance = dredge(m_for_trip_dist.gamma) 
 m.pars.for.trip.distance = get.models(model.sel.for.trip.distance,1)[[1]]
-emmeans.for.trip.distance <- emmeans(m.pars.for.trip.distance, pairwise~breeding.phase*sex, type='response')
+emmeans.for.trip.distance <- emmeans(m_for_trip_dist.gamma, pairwise~breeding.phase*sex, type='response')
 emmeans.for.trip.distance # all pairwise comparisons are significant, except eggs vs chicks for males. 
+dist.trips.pairs = as.data.frame(emmeans.for.trip.distance$contrasts)[c(2,5,1,6),]
+dist.trips.pairs$sign = ifelse(dist.trips.pairs$p.value<0.001, "***",
+                              ifelse(dist.trips.pairs$p.value<0.01, "**",
+                                     ifelse(dist.trips.pairs$p.value<0.05, "*", "n.s.")))
 
-# Save the different tables into subtables to combine as Table S6:
-write.csv(make.table.from.dredge.output(model.sel.n.trips, lme4=T), "output/TableS6a - Foraging trip number.csv")
-write.csv(make.table.from.dredge.output(model.sel.for.trip.dur.gamma, lme4=T), "output/TableS6b - Foraging trip duration.csv")
-write.csv(make.table.from.dredge.output(model.sel.for.trip.distance, lme4=T), "output/TableS6c - Foraging trip distance.csv")
+# Save the different tables into subtables to combine as Table 4:
+write.csv(make.table.from.dredge.output(model.sel.n.trips), "output/Table2a - Foraging trip number 30 min.csv")
+write.csv(make.table.from.dredge.output(model.sel.for.trip.dur.gamma), "output/Table2b - Foraging trip duration 30 min.csv")
+write.csv(make.table.from.dredge.output(model.sel.for.trip.distance), "output/Table2c - Foraging trip distance 30 min.csv")
 # the models using the poisson distribution count one parameter less, as the variance is not estimated but calculated. 
-
-# SAME ANALYSIS BUT ONLY FOR MARINE (incl brackish) FORAGING TRIPS: 
-df.marine.for.trips <- df.for.trips[df.for.trips$duration_mainland==0&df.for.trips$marine.trip==1,]
-marine.for.trip.dist.dur.bird.year <- aggregate(cbind(distance.to.nest, trip.duration) ~ breeding.phase + year + birdID + sex, df.marine.for.trips, mean)
-# calculate the number of marine foraging trips per day:
-## number of foraging trips per day per individual:
-n_marine_trips_day_bird_year = aggregate(freq~year+birdID+sex+yday_start, data=df.marine.for.trips, sum)
-n_marine_trips_day_bird_year_zeros = merge(phase_yday_bird_year, n_marine_trips_day_bird_year, all.x=T)
-n_marine_trips_day_bird_year_zeros$freq[is.na(n_marine_trips_day_bird_year_zeros$freq)]=0
-names(n_marine_trips_day_bird_year_zeros)[7]='n_marine_trips'
-n_marine_trips_day_bird_year_mean = aggregate(n_marine_trips~year+birdID+sex+breeding.phase, data=n_marine_trips_day_bird_year_zeros, mean)
-n_marine_trips_day_bird_year_mean$year = as.factor(n_marine_trips_day_bird_year_mean$year)
-n_marine_trips_day_bird_year_mean[order(n_marine_trips_day_bird_year_mean$birdID, n_marine_trips_day_bird_year_mean$year),]
-
-# NUMBER OF MARINE FORAGING TRIPS
-m_n_for_mar_trips  = glmer(n_marine_trips~breeding.phase*sex+(1|birdID)+(1|year), data=n_marine_trips_day_bird_year_zeros, family="poisson", na.action='na.fail')
-model.sel.n.mar.trips = dredge(m_n_for_mar_trips) # most parsimonious model includes the interaction between sex and breeding phase
-# sex is supported, but the interaction is not. This shows that females and males show a similar increase in the number of marine foraging trips. 
-m.pars.n.mar.trips = get.models(model.sel.n.mar.trips,2)[[1]]
-summary(m.pars.n.mar.trips)
-emmeans.n.mar.trips <- emmeans(m.pars.n.mar.trips, pairwise~breeding.phase+sex, transform='response')
-emmeans.n.mar.trips # both females and males double the number of marine foraging trips, but in absolute number, this increase is much higher for females than for males.
-# It is due to the Poisson distribution that a multiplicative effect is estimated rather than an additive effect.
-
-# DURATION OF FORAGING TRIPS
-m_mar.for.trip.dur  = glmer(trip.duration~breeding.phase*sex+(1|birdID)+(1|year), data=df.marine.for.trips, family=Gamma("inverse"), na.action="na.fail")
-model.sel.mar.for.trip.dur = dredge(m_mar.for.trip.dur) # the sex effect is still supported, but much less so. 
-m.pars.mar.trip.dur = get.models(model.sel.mar.for.trip.dur,2)[[1]]
-emmeans.mar.trip.dur <- emmeans(m.pars.mar.trip.dur, pairwise~breeding.phase+sex, transform='response')
-emmeans.mar.trip.dur # pairwise differences between males and females are N.S. Females make marine trips that last slightly longer than those of males. 
-# Marine trips are shorter during chick rearing than during egg incubation.
-
-# DISTANCE OF MARINE FORAGING TRIPS
-m_mar.for.trip.dist  = glmer(distance.to.nest~breeding.phase*sex+(1|birdID)+(1|year), data=df.marine.for.trips, family=Gamma("inverse"), na.action="na.fail")
-model.sel.mar.for.trip.dist = dredge(m_mar.for.trip.dist) # the sex effect is still supported, but much less so. 
-m.pars.mar.trip.dist = get.models(model.sel.mar.for.trip.dist,1)[[1]]
-summary(m.pars.mar.trip.dist)
-emmeans.mar.trip.dist <- emmeans(m.pars.mar.trip.dist, pairwise~breeding.phase*sex, transform='response')
-emmeans.mar.trip.dist # pairwise difference is only sign. for eggs F > chicks F. 
-# basically, the only real support is the interaction between breeding phase and sex. Where males make longer distance foraging trips during chick-rearing than during egg incubation, females make shorter trips. 
-
-# Save info for Table S7
-write.csv(make.table.from.dredge.output(model.sel.n.mar.trips, lme4=T), "output/TableS7a - Marine foraging trip number.csv")
-write.csv(make.table.from.dredge.output(model.sel.mar.for.trip.dur, lme4=T), "output/TableS7b - Marine foraging trip duration.csv")
-write.csv(make.table.from.dredge.output(model.sel.mar.for.trip.dist, lme4=T), "output/TableS7c - Marine foraging trip distance.csv")
-
-hist()
-

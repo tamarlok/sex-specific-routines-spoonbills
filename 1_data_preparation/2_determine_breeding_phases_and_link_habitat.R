@@ -47,6 +47,8 @@ Sys.setenv(TZ='Europe/Amsterdam') # make sure that time zone is set to local tim
 
 gps.breeding.data.list <- list()
 
+for(i in 1:length(gps.data.list)) print(paste(i, gps.data.list[[i]]$device_info_serial[1])) # to see the i of each individual
+
 for (i in 1:length(gps.data.list)) {
   df <- gps.data.list[[i]]
   birdID <- names(gps.data.list)[i]
@@ -73,8 +75,8 @@ for (i in 1:length(gps.data.list)) {
   # add habitat
   habitats.to.add <- over(df, schier_new84_sel) 
   df <- data.frame(df, habitats.to.add[,c('habitat','habitat_type','habitat_salinity','land_water')]) # this function does not yet remove GPS points outside the habitat map, but gives NA's for the habitat columns.  
-  # calculate duration of GPS-fixes, but before doing so, first order the df according to date_time (if this was not already done)
   df[is.na(df$habitat),c('habitat','habitat_type','habitat_salinity','land_water')] <- "unknown" # replace habitat of locations outside habitat with "unknown" (so they are not deleted within the determine.breeding.phase function)
+  # calculate duration of GPS-fixes, but before doing so, first order the df according to date_time (if this was not already done)
   df <- as.data.frame(df)
   df <- df[order(df$date_time),]
   df$time_to_previous <- c(NA, interval(df$date_time[1:(dim(df)[1]-1)], df$date_time[2:dim(df)[1]])%/%seconds(1))
@@ -89,17 +91,22 @@ for (i in 1:length(gps.data.list)) {
   df<-merge(df, n_hour)
   df$speed_km=(df$speed_2d*60*60)/1000
   # only use data from the day after the catch date onward
-  catch.date <- bird.data[bird.data$birdID==birdID,c('logger','catch.date')]
+  catch.date <- bird.data[bird.data$birdID==birdID,c('logger','start_deployment')]
   df <- merge(df, catch.date, by.x='device_info_serial', by.y='logger', all.x=T)
-  df$catch.date <- dmy(df$catch.date)
-  df <- df[df$date_time>df$catch.date,]
+  head(df)
+  df$start_deployment <- dmy(df$start_deployment)
+  df <- df[floor_date(df$date_time, 'days')>floor_date(df$start_deployment, 'days'),] 
   breeding.data.bird <- merge(unique(df[,c('birdID','year')]), breeding.data)
   # determine nest location and breeding phases for each year seperately:
   df<-df[order(df$date_time),]
   # determine breeding phases per bird per year (only if there is at least one record in breeding.data.bird):
   df.list.breeding.year <- list()
   df.all=df # as a back-up to check the determine.breeding.phases function, can be removed later
+  
   if (dim(breeding.data.bird)[1]>0) for (j in 1:dim(breeding.data.bird)[1]) df.list.breeding.year[[j]] <- determine.breeding.phases(df=df[df$year==breeding.data.bird$year[j],], day_hatched=breeding.data.bird$hatchday[j], day_hatched2=breeding.data.bird$hatchday2[j], successful=breeding.data.bird$successful[j]) 
+  
+  test=df.list.breeding.year[[j]][,c('date_time','breeding.phase','attempt')]
+  
   if (length(df.list.breeding.year)>0) {
     df.breeding <- from.list.to.df(df.list.breeding.year)
     gps.breeding.data.list[[i]] <- df.breeding
@@ -136,17 +143,18 @@ gps.breeding.data$breeding.phase.nr[gps.breeding.data$breeding.phase=='post.bree
 gps.breeding.data$breeding.phase.nr[gps.breeding.data$breeding.phase=='post.breeding.unsuccessful'] = 6
 gps.breeding.data$breeding.phase = paste(gps.breeding.data$breeding.phase.nr, gps.breeding.data$breeding.phase, sep='.')
 
-## add columns with week relative to the hatching day.
-## change the attempt number of the pre-breeding phase, to make it the same attempt as the subsequent breeding attempt:
-gps.breeding.data$attempt[gps.breeding.data$breeding.phase=='1.pre-breeding'] = gps.breeding.data$attempt[gps.breeding.data$breeding.phase=='1.pre-breeding']+1
 gps.breeding.data = gps.breeding.data[order(gps.breeding.data$year, gps.breeding.data$birdID, gps.breeding.data$yday_CEST),]
-ydays.year.bird.phase.all = unique(gps.breeding.data[,c('year','birdID','sex','breeding.phase.nr','attempt','yday_CEST','week')])
+ydays.year.bird.phase.all = unique(gps.breeding.data[,c('year','birdID','sex','breeding.phase','breeding.phase.nr','attempt','yday_CEST','week')])
 dim(ydays.year.bird.phase.all) 
 
-yday.min.year.bird.phase = aggregate(yday_CEST~birdID+sex+breeding.phase.nr+year+attempt, data=ydays.year.bird.phase.all, min)
+yday.min.year.bird.phase = aggregate(yday_CEST~year+attempt+birdID+sex+breeding.phase+breeding.phase.nr, data=ydays.year.bird.phase.all, min)
+yday.min.year.bird.phase = yday.min.year.bird.phase[order(yday.min.year.bird.phase$year, yday.min.year.bird.phase$birdID, yday.min.year.bird.phase$attempt, yday.min.year.bird.phase$breeding.phase.nr),]
+
+# this could also be done within the determine.breeding.phases functie:
 hatch_day_bird_year = yday.min.year.bird.phase[yday.min.year.bird.phase$breeding.phase.nr==4,c('birdID','year','attempt','yday_CEST')]
 names(hatch_day_bird_year)[4]='hatch_day'
 gps.breeding.data = merge(gps.breeding.data, hatch_day_bird_year, all.x=T)
+
 unique(gps.breeding.data$hatch_day)
 gps.breeding.data$day_rel_hatching = gps.breeding.data$yday_CEST-gps.breeding.data$hatch_day
 gps.breeding.data$week_rel_hatching = floor(gps.breeding.data$day_rel_hatching/7)
