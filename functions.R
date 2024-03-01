@@ -1,3 +1,12 @@
+# ipak function: install and load multiple R packages.
+# check to see if packages are installed. Install them if they are not, then load them into the R session.
+ipak <- function(pkg){
+  new.pkg <- pkg[!(pkg %in% installed.packages()[, "Package"])]
+  if (length(new.pkg)) 
+    install.packages(new.pkg, dependencies = TRUE)
+  sapply(pkg, require, character.only = TRUE)
+}
+
 ### Functions to import tracking data from UvA-BiTS website ###
 # make R data file
 ImportGPSDataBird <- function(birdID, date_start, date_end) {
@@ -96,18 +105,19 @@ noise <- function(x){
 ### End of summary statistics function ###
 
 ### create fixed segments of acc samples, providing segment length and other options 
-create.fixed.segments <- function(segment.length, acc = acc.annotated, remove.shorter.segments = TRUE, sampling.freq=20, annotated.data=T, naomit=T) { # segment length is expressed in seconds
+create.fixed.segments <- function(segment.length, data, remove.shorter.segments = TRUE, sampling.freq=20) { # segment length is expressed in seconds
   
   samples.per.segment <- ceiling(segment.length * sampling.freq) # to make it an integer (and select only segments with highest possible number of samples, given the sampling frequency; e.g. for a segment of 0.8 seconds at 2 Hz, this is 2 samples)
   
   # 20210617: these two lines are added to include the adjustment of the original sampling frequency (which was 20 Hz) within the creation of fixed segments code:
-  indices.to.use <- seq(min(acc$Index),max(acc$Index),by=20/sampling.freq)
-  acc.sel = acc[acc$Index %in% indices.to.use,] 
+  indices.to.use <- seq(min(data$Index),max(data$Index),by=20/sampling.freq)
+  data.sel = data[data$Index %in% indices.to.use,] 
 
-  acc.sel$segment.id.cut <- paste(acc.sel$obs.id, formatC(format="d", ceiling((acc.sel$Index+1)/(segment.length*20)),flag="0",width=ceiling(log10(max(ceiling((acc.sel$Index+1)/(segment.length*20)))))), sep = ".") # 20 is the sampling frequency at which the data was originally collected
+  data.sel$segment.id.cut <- paste(data.sel$obs.id, formatC(format="d", ceiling((data.sel$Index+1)/(segment.length*20)),flag="0",width=ceiling(log10(max(ceiling((data.sel$Index+1)/(segment.length*20)))))), sep = ".") # 20 is the sampling frequency at which the data was originally collected
   
+  data.sel <- na.omit(data.sel)
   ## calculate summary statistics for each segment: 
-  seg.df <- ddply(acc.sel, .(segment.id.cut, birdID), summarize, 
+  seg.df <- ddply(data.sel, .(segment.id.cut, birdID, date_time), summarize, 
                   nobs.segments  = length (x), speed_2d = mean(speed_2d),
                   mean.x = mean(x), mean.z = mean(z), mean.y = mean(y), 
                   min.x = min (x), min.y = min (y), min.z = min (z),
@@ -124,165 +134,18 @@ create.fixed.segments <- function(segment.length, acc = acc.annotated, remove.sh
   seg.df$odba <- seg.df$odba.x + seg.df$odba.y + seg.df$odba.z 
 
   # If remove.shorter.segments is set at TRUE, then only use the segments of specified segment length for the machine learning and testing: 
-  if (remove.shorter.segments == TRUE) seg.df.sel <- seg.df[seg.df$nobs.segments==samples.per.segment,] 
-  set.seed(3) # to reproduce the same results from the random choice of equally occurring behaviours below (not sure if this is passed onto the global environment; this should not happen!)
-  if (annotated.data==T) seg.df.sel <- assign.behaviour.to.segments(seg.df.sel, acc.sel) # here is some randomness included, when there are two behaviours expressed an equal amount of time within a single segment. One of these behaviours is then randomly chosen.
-  table(seg.df.sel$behaviour.pooled)
-  if (naomit==T) list(na.omit(seg.df.sel), acc.sel) else list(seg.df.sel, acc.sel) # remove cases where certain predictor variables (e.g., kurtosis or skewness) could not be calculated, if naomit=T
+  if (remove.shorter.segments == TRUE) seg.df <- seg.df[seg.df$nobs.segments==samples.per.segment,] 
+  seg.df
 }
 
-#########################################################
-## Function to create dataframe with flexible segments ##
-#########################################################
-
-## check whether this works with downsampling the sampling frequency (see above for fixed segment lengths)
-create.flexible.segments <- function(ARL0=5000, acc = acc.annotated, sampling.freq=20, max.segment.length=1.6, segmentation.script = "new", startup=1, annotated.data=T, naomit=T) {
-  
-  ### START creation flexible segments ###
-  
-  ## Renumber column Index so that each obs.id starts at 0
-  index.min.obs.id <- aggregate(Index~obs.id, acc, min)
-  names(index.min.obs.id)[2]<-"Index.start"
-  acc <- merge(acc, index.min.obs.id)
-  acc$Index <- acc$Index-acc$Index.start
-
-  ### cut the segments to the length set by max.segment.length to allow the analysed data to better reflect how the data is collected in the long term on the majority of transmitters (in case of the spoonbills, mostly during bouts of 1.6 sec); by default it is set to 10 sec, which is the longest sampling duration in the data (10 sec), used for birds that were video-recorded: 
-  acc$obs.id.cut <- paste(acc$obs.id, formatC(format="d", ceiling((acc$Index+1)/(max.segment.length*20)),flag="0",width=ceiling(log10(max(ceiling((acc$Index+1)/(max.segment.length*20)))))), sep = ".") 
-  
-  acc$segment.id.cut <- acc$obs.id.cut
-  acc$duration <- 1/20
-  
-  un.obs.cut <- aggregate(duration~obs.id.cut, acc, sum)
-  
-  un.obs.cut <- un.obs.cut[round(un.obs.cut$duration,1)==max.segment.length,] # only select segments equal to the max segment length (as this will be the segment length at which the data is collected)
-  un.obs.cut <- un.obs.cut$obs.id.cut
-  acc <- acc[acc$obs.id.cut %in% un.obs.cut, ]
-  
-  # new script:
-  if (segmentation.script == "new") { 
-    for(k in 1 : length(un.obs.cut)) {
-    temp.acc <- acc[which(acc$obs.id.cut == un.obs.cut[k]),]
-    
-    dcpb <- processStream(temp.acc$x, "GLR", ARL0=ARL0, startup=startup)   
-    
-    incl <- dcpb$changePoints[c(1,which(diff(dcpb$changePoints)>2)+1)] # after selecting the first changepoint, only select subsequent changepoints that are more than 2 acc-samples further from the previous changepoint (i.e. causing the minimum segment length to become 3 samples); Bom et al. 2014 used a min sample size of 4 here. If breakpoints are estimated at position 3, 5 and 7 for example, only 3 is used.  
-    
-    if (is.na(max(incl))==F) # only run the below line when there is at least one change point, otherwise use the original (and entire) segment.id.cut. 
-        acc$segment.id.cut[which(acc$obs.id.cut == un.obs.cut[k])] <- paste(temp.acc$obs.id.cut, letters[rep(c(1:(length(incl)+1)), c(diff(c(0, incl, nrow(temp.acc)))))], sep = ".")
-    }
-  }
-    
-   # old script used in Bom et al. 2014 (performs particularly worse with segment lengths of 1-2 s; the new script is insensitive to max seg length)
-   if (segmentation.script == "old") {
-     for(k in 1 : length(un.obs.cut)) {
-      temp.acc <- acc[which(acc$obs.id.cut == un.obs.cut[k]),]
-      
-      dcpb <- processStream(temp.acc$x,"GLR",ARL0=ARL0, startup=startup)
-      
-      incl <- dcpb$changePoints[c(1,which(diff(dcpb$changePoint)>3)+1)]
-      if(length(incl) > 1) # this code causes the segments to be cut into smaller segments only when there is more than one breakpoint, whereas it should also be cut when there is only one breakpoint. This causes the dip in performance at max segment lengths of 1-2 s.
-        acc$segment.id.cut[which(acc$obs.id.cut == un.obs.cut[k])] <- paste(temp.acc$obs.id.cut, letters[rep(c(1:(length(incl)+1)), c(diff(c(0, incl, nrow(temp.acc)))))], sep = ".")
-    }
-  }
-
-  # segments can be shorter but never larger than the sampling duration * sampling frequency:
-  max.segment.length * sampling.freq
-  min(table(acc$segment.id.cut))
-  max(table(acc$segment.id.cut))
-  
-  ### END creation flexible segments ###
-  
-  # remove NA's from acc:
-  if (annotated.data==T) acc <- na.omit(acc[,c("birdID","segment.id.cut","speed_2d","x","y","z","behaviour.pooled")]) else acc <- na.omit(acc[,c("birdID","segment.id.cut","device_info_serial","date_time","latitude","longitude","altitude","speed_2d","x","y","z")])
-  
-  ## calculate summary statistics per segment
-  seg.df <- ddply(acc, .(segment.id.cut, birdID), summarize, 
-                  nobs.segments  = length (x), speed_2d = mean(speed_2d),
-                  mean.x = mean(x), mean.z = mean(z), mean.y = mean(y), 
-                  min.x = min (x), min.y = min (y), min.z = min (z),
-                  max.x = max (x), max.y = max (y), max.z = max (z), 
-                  trend.x = trend (x), trend.y = trend (y), trend.z = trend (z),
-                  odba.x = odba(x), odba.y = odba(y), odba.z = odba(z), 
-                  dps.x = dps(x), dps.y = dps(y), dps.z = dps(z),
-                  fdps.x = fdps(x),  fdps.y = fdps(y), fdps.z = fdps(z), 
-                  kurt.x = kurtosis(x), kurt.y = kurtosis(y), kurt.z = kurtosis(z), 
-                  skew.x = skewness(x), skew.y = skewness(y), skew.z = skewness(z),
-                  noise.x = noise(x), noise.y = noise(y), noise.z = noise(z)
-  ) 
-  
-  seg.df$odba <- seg.df$odba.x + seg.df$odba.y + seg.df$odba.z 
-  if (annotated.data==T) seg.df <- assign.behaviour.to.segments(seg.df, acc)
-  if (naomit==T) list(na.omit(seg.df), acc) # remove cases where certain predictor variables (e.g., kurtosis or skewness) could not be calculated
-  else list(seg.df, acc)
-}  
-
-assign.behaviour.to.segments <- function(seg.df, acc) {
-    # match most occurring behaviour during a segment with seg.df data frame (this is different from Roeland's code)
-    acc$freq <- 1
-    segment.id.cut.behaviours <- aggregate(freq~segment.id.cut+behaviour.pooled, acc, sum)
-    segment.id.cut.nobsmax <- aggregate(freq~segment.id.cut, segment.id.cut.behaviours, max) # the number of points that the longest expressed behaviour is expressed
-    segment.id.cut.behavdom <- merge(segment.id.cut.behaviours, segment.id.cut.nobsmax, by=c('segment.id.cut','freq')) # behaviour that is expressed the longest
-    # randomly select one of the equally often expressed behaviours:
-    segment.id.cut.behavdom$rnd <- runif(dim(segment.id.cut.behavdom)[1])
-    segment.id.cut.rndmax <- aggregate(rnd~segment.id.cut, segment.id.cut.behavdom, max)
-    segment.id.cut.behavsel <- merge(segment.id.cut.behavdom, segment.id.cut.rndmax, by=c("segment.id.cut","rnd"))
-    
-    # determine whether a segment consists of a single behaviour ("clean" segments)
-    num.obs <- cast(melt(acc), segment.id.cut ~ behaviour.pooled, length, subset = variable == 'birdID')
-    nobs.segment <- aggregate(freq~segment.id.cut, acc, sum)
-    names(nobs.segment)[2]<-"nobs"
-    segment.id.cut.behavsel <- merge(segment.id.cut.behavsel, nobs.segment, all.x=T)
-    segment.id.cut.behavsel$single.behaviour <- 0
-    segment.id.cut.behavsel$single.behaviour[segment.id.cut.behavsel$freq==segment.id.cut.behavsel$nobs] <- 1
-    
-    seg.df$behaviour.pooled <- segment.id.cut.behavsel$behaviour.pooled[match(seg.df$segment.id.cut,  segment.id.cut.behavsel$segment.id.cut)] 
-    seg.df$single.behaviour <- segment.id.cut.behavsel$single.behaviour[match(seg.df$segment.id.cut,  segment.id.cut.behavsel$segment.id.cut)] 
-    seg.df <- seg.df[is.na(seg.df$behaviour.pooled)==F,] # remove cases where behaviour was not classified
-    seg.df
-  }
-     
-######################################
-## Function for Random Forest model ##
-######################################
-
-RF.model <- function(seg.df, acc, selected.variables = predictors.all, clean.segments.train = FALSE, clean.segments.test = FALSE, stand=1, search=1, drink=1, handle=1, ingest=1, walk=1, soar=1) {
-  # in the segmentation function, there is an option to remove all rows which contain at least 1 predictor with NA. If this has NOT been done, we here remove the predictors that contain all NA's (because they can't be calculated over 1 or 2 points), and then remove the remaining rows that still have some NA's for other predictors. 
-  seg.df <- seg.df[,apply(!is.na(seg.df), 2, any)]
-  seg.df <- na.omit(seg.df)
-    
-  ind <- sample(1:2, nrow(seg.df), replace = TRUE, prob=c(0.7, 0.3)) # divide data into 70% training (ind=1) and 30% testing (ind=2) data 
-  data.train <- seg.df[ind == 1,] # the training dataset
-  data.test <- seg.df[ind ==2,] # the testing dataset
-  
-  # perform up- and downsampling on the train dataset only, to be able to properly interpret the effects on sensitivity and precision for the test dataset
-  data.train <- downsampling.behaviours(data.train, stand=stand, search=search)
-  data.train <- upsampling.behaviours(data.train, drink=drink, handle=handle, ingest=ingest, walk=walk, soar=soar)
-  data.train$behaviour.pooled <-  factor(data.train$behaviour.pooled) 
-  if (clean.segments.train == T) data.train <- data.train[data.train$single.behaviour==1,]
-  if (clean.segments.test == T) data.test <- data.test[data.test$single.behaviour==1,]
-  
-  # remove the predictor variables from selected.variables that contained all NA in seg.df (e.g. noise when there are only 2 samples per segment, at 2 Hz)
-  selected.variables <- selected.variables[selected.variables%in%names(seg.df)]
-  data.train <- data.train[,c("behaviour.pooled", selected.variables)]
-  
-  # fit the model on the train dataset
-  fit.RF <- randomForest(behaviour.pooled ~ ., data = data.train, importance=T)
-  behav.pred <- predict(fit.RF, data.test) # do the prediction on a random selection of the dataset (the testing/validation dataset)
-  df.pred <- cbind(data.test, behav.pred)
-  acc.pred  <- merge(acc, df.pred[,c("segment.id.cut","behav.pred")])
-  mytable <- table(predicted = acc.pred$behav.pred, observed = acc.pred$behaviour.pooled)
-  mytable <- mytable[, match(rownames(mytable), colnames(mytable))]
-  list(fit.RF, mytable, df.pred)
-}
-
-link.gps.acc.data <- function(gps.data, acc.data, device.info) {
-  data <- merge(gps.data, acc.data)
-  data$x <- (data$x_acceleration-device.info$x_o)/device.info$x_s
-  data$y <- (data$y_acceleration-device.info$y_o)/device.info$y_s
-  data$z <- (data$z_acceleration-device.info$z_o)/device.info$z_s
-  data <- na.omit(data[,c('device_info_serial','index','date_time',"longitude","latitude","altitude",'speed_2d','x','y','z')])
-  data
-}
+#link.gps.acc.data <- function(gps.data, acc.data, device.info) {
+#  data <- merge(gps.data, acc.data)
+#  data$x <- (data$x_acceleration-device.info$x_o)/device.info$x_s
+#  data$y <- (data$y_acceleration-device.info$y_o)/device.info$y_s
+#  data$z <- (data$z_acceleration-device.info$z_o)/device.info$z_s
+#  data <- na.omit(data[,c('device_info_serial','index','date_time',"longitude","latitude","altitude",'speed_2d','x','y','z')])
+#  data
+#}
 
 from.list.to.df <- function(list) {   # change from list to dataframe
   df <- list[[1]]
@@ -396,7 +259,6 @@ determine.breeding.phases <- function(df, day_hatched=NA, day_hatched2=NA, succe
         phase.doy$attempt[i]=phase.doy$attempt[i-1]
       else phase.doy$attempt[i]=phase.doy$attempt[i-1]+1 
     }
-    
 
     table(phase.doy$breeding.phase) # to check that egg phase is indeed 25 days, and chick phase 30 days. 
     

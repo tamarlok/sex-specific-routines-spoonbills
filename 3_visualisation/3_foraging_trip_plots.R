@@ -3,13 +3,11 @@ for.trip.dist.dur.bird.year <- aggregate(cbind(distance.to.nest, trip.duration) 
 # calculate mean number of foraging trips per bird per breeding phase per year for plotting
 n_trips_day_bird_year_mean = aggregate(n_trips~year+birdID+sex+breeding.phase, data=n_trips_day_bird_year_zeros, mean)
 n_trips_day_bird_year_mean$breeding.phase = factor(n_trips_day_bird_year_mean$breeding.phase)
-table(paste(n_trips_day_bird_year_mean$sex, n_trips_day_bird_year_mean$birdID))
 birds.for.trips = unique(df.for.trips[,c('birdID','year','sex','breeding.phase')])
 sample.sizes.for.trips <- table(birds.for.trips$breeding.phase, birds.for.trips$sex)
 
 ############### FIGURE 6 ###############
-# Now combine the three graphs into one
-pdf("output/Fig6.pdf",13,7)
+postscript("output/Fig6.eps",width=13,height=7)
 #windows(14,8)
 par(mar=c(1,6,0,0), oma=c(4,0,3,10))
 layout(matrix(1:3, ncol=3))
@@ -24,7 +22,6 @@ axis(1, at=1:2+0.15, labels=c('', 'rearing'), cex.axis=2, line=2, tick=F)
 plot.sign.for.trips(ymax=ymax, signs=n.trips.pairs$sign)
 mtext("Number of foraging trips per 24 hours", 2, 3.5, cex=1.5)
 text(0.9,0.97*ymax,"(a)",cex=2)
-# show sample sizes! 
 axis(3, at=1:2, sample.sizes.for.trips[1:2,1], tick=F, cex.axis=1.8)
 axis(3, at=1:2+0.3, sample.sizes.for.trips[1:2,2], tick=F, cex.axis=1.8)
 axis(3, at=0.8, "N =", tick=F, cex.axis=1.8)

@@ -1,5 +1,3 @@
-Sys.setenv(TZ='Europe/Amsterdam')
-
 cols.behaviour2 = c('chartreuse4','darkolivegreen3','khaki','gold','orange','red','lightblue','cadetblue','blue')
 cols.behaviour2.pooled = c('chartreuse4','gold','gold','gold','orange','red','blue','blue','blue')
 breeding.phase.cols = c('grey','white','darkorange','dodgerblue','darkolivegreen3','red') # colours for the different breeding.phases for plotting
@@ -14,38 +12,6 @@ table(birddays$birdID, birddays$month, birddays$year)
 sample_size_birdyear_phase = as.data.frame(table(paste(birddays$birdID, birddays$year, sep="_"), birddays$breeding.phase2))
 names(sample_size_birdyear_phase)=c('birdyear','breeding.phase2','ndays')
 
-# explore the time allocation graphs per bird, to see if there is suspicious data:
-gps.breeding.data.behav$birdyear <- paste(gps.breeding.data.behav$birdID, gps.breeding.data.behav$year, sep="_")
-gps.breeding.data.behav$freq <- 1
-dur.behav.hr.birdyear.xtabs = xtabs(freq~behaviour2+hour_CEST+breeding.phase2+birdyear, data=gps.breeding.data.behav)
-for (birdyear in dimnames(dur.behav.hr.birdyear.xtabs)$birdyear) {
-  png(paste("output/time allocation per bird per year/",birdyear,".png",sep=''))
-  #windows(5,10)
-  dur.behav.hr.pre = as.matrix(prop.table(dur.behav.hr.birdyear.xtabs[,,'1.pre-breeding',birdyear], 2))
-  dur.behav.hr.eggs = as.matrix(prop.table(dur.behav.hr.birdyear.xtabs[,,'3.eggs',birdyear], 2))
-  dur.behav.hr.chicks = as.matrix(prop.table(dur.behav.hr.birdyear.xtabs[,,'4.chicks',birdyear], 2))
-  dur.behav.hr.post = as.matrix(prop.table(dur.behav.hr.birdyear.xtabs[,,'5.post-breeding',birdyear], 2))
-  Ns = sample_size_birdyear_phase$ndays[sample_size_birdyear_phase$birdyear==birdyear]
-  layout(matrix(1:4, byrow=T, ncol=1))
-  par(mar=c(1,1,1.2,0), oma=c(5,5,4,2))
-  barplot(dur.behav.hr.pre[c(1,8,7,9,6,2,4,3,5),], main='', col=cols.behaviour2, las=1, xaxt='n' , cex.axis=1.3, border=NA, space=c(0.1,0.1), ylim=c(0,1))
-  mtext('PRE-BREEDING', 4, -0.5, cex=0.9)
-  mtext(paste("(N=",Ns[1],' days)', sep=''), 4, 0.5, cex=0.7)
-  barplot(dur.behav.hr.eggs[c(1,8,7,9,6,2,4,3,5),], main='', col=cols.behaviour2, las=1, xaxt='n' , cex.axis=1.3, border=NA, space=c(0.1,0.1), ylim=c(0,1))
-  mtext('INCUBATION', 4, -0.5, cex=0.9)
-  mtext(paste("(N=",Ns[2],' days)', sep=''), 4, 0.5, cex=0.7)
-  barplot(dur.behav.hr.chicks[c(1,8,7,9,6,2,4,3,5),], main='', col=cols.behaviour2, las=1, xaxt='n', cex.axis=1.3, border=NA, space=c(0.1,0.1), ylim=c(0,1))
-  mtext('CHICK-REARING', 4, -0.5, cex=.9)
-  mtext(paste("(N=",Ns[3],' days)', sep=''), 4, 0.5, cex=0.7)
-  barplot(dur.behav.hr.post[c(1,8,7,9,6,2,4,3,5),], main='', col=cols.behaviour2, las=1, cex.axis=1.3, cex=1, border=NA, space=c(0.1,0.1), ylim=c(0,1))
-  mtext('POST-BREEDING', 4, -0.5, cex=.9)
-  mtext(paste("(N=",Ns[4],' days)', sep=''), 4, 0.5, cex=0.7)
-  mtext('Time of day in hours (local time)', 1, 3, cex=1.2, outer=T)
-  mtext('Time allocation', 2, 3, cex=1.2, outer=T)
-  mtext(birdyear,3,1,cex=1.2,outer=T)
-  dev.off()
-}
-
 dur.behav.hr.xtabs = xtabs(freq~behaviour2+hour_CEST+sex+breeding.phase2, data=gps.breeding.data.behav)
 rownames(dur.behav.hr.xtabs)
 unique(paste(gps.breeding.data.behav$birdID, gps.breeding.data.behav$sex))
@@ -58,9 +24,10 @@ dur.behav.hr.f.chicks = as.matrix(prop.table(dur.behav.hr.xtabs[,,'F','4.chicks'
 dur.behav.hr.m.post = as.matrix(prop.table(dur.behav.hr.xtabs[,,'M','5.post-breeding'], 2))
 dur.behav.hr.f.post = as.matrix(prop.table(dur.behav.hr.xtabs[,,'F','5.post-breeding'], 2))
 
-# and now plot all 4 breeding phases
-pdf("output/Fig2.pdf",10,8)
-# windows(10,8)
+####################################
+############## FIGURE 2 ############
+####################################
+postscript("output/Fig2.eps",width=10,height=8)
 layout(matrix(1:8, byrow=T, ncol=2))
 par(mar=c(1,1,1.2,0), oma=c(5,5,4,15))
 barplot(dur.behav.hr.f.pre[c(1,8,7,9,6,2,4,3,5),], main='', col=cols.behaviour2, las=1, xaxt='n' , cex.axis=1.3, border=NA, space=c(0.1,0.1))
@@ -92,8 +59,7 @@ duration_behaviour_bird_phase_year$prop_for <- duration_behaviour_bird_phase_yea
 duration_behaviour_bird_phase_year$prop_for_marine <- duration_behaviour_bird_phase_year$dur_foraging_marine/duration_behaviour_bird_phase_year$dur_foraging
 
 ############## FIGURE 5 ###############
-pdf("output/Fig5.pdf",10,8)
-#windows(10,8)
+postscript("output/Fig5.eps",width=10,height=8)
 layout(1:2)
 par(mar=c(1,1,0,0), oma=c(4,4,3,7))
 # PANEL A: proportion of time spent foraging ~ sex + breeding phase
@@ -129,8 +95,7 @@ mtext("Marine foraging probability",2,3,cex=1.2)
 mtext("Breeding phase",1,3,cex=1.2)
 legend(5.8,0.3, legend=c("female","male"), pch=22, pt.bg = c("lightcoral","lightskyblue"), col=c("coral4","lightskyblue4"), cex=1, xpd=NA, bty='n')
 dev.off()
-
-### FIGURE 3 ###
+### END FIGURE 3 ###
 
 # data preparation
 gps.breeding.data.behav$freq <- 1
@@ -214,8 +179,6 @@ df.diel.tide.sex.phase34$se.fit <- pd.bam$se.fit
 
 # predict using link function, then calculate 95% CI and then translate to real (response) scale:
 pd.bam.link = predict(bam.nest.bxsxdxt.REML, newdata=df.diel.tide.sex.phase34, type='link', se.fit=T, exclude=c('s(birdID)','s(year)'))
-pd.bam.link$fit[1:10]
-pd.bam.link$se.fit[1:10]
 pd.bam.link$li = pd.bam.link$fit-1.96*pd.bam.link$se.fit
 pd.bam.link$ui = pd.bam.link$fit+1.96*pd.bam.link$se.fit
 pd.bam.link$fit.real = plogis(pd.bam.link$fit)
@@ -253,8 +216,9 @@ plot.dark.hours.rad.phase <- function(sunrise,sunset,dusk,dawn){
   polygon(x=c(rep(as.numeric(dusk)/86400*2*pi,2),24,24), y=c(0,1,1,0), col='grey40', border=NA)
 }
 
-# make the same plot but now with males and females in the same panels. 
-pdf("output/Fig3.pdf",10,6)
+
+### START FIGURE 3 ###
+cairo_ps("output/Fig3.eps",width=10,height=6)
 #windows(12,8)
 plotnr=0
 layout(matrix(1:4, nrow=2, byrow=T))
@@ -294,11 +258,12 @@ mtext("Time of the day (hour in CEST)",1,outer=T,line=2)
 mtext("Probability of nest attendance",2,outer=T,line=2.5)
 legend(2.3*pi,0.25,c("female","male"), pch=15, col=c("lightcoral","lightskyblue"), xpd=NA, cex=1.2)
 dev.off()
+### END FIGURE 3 ###
 
-### FIGURE S3: nest attendance in relation to the tide: 
+### FIGURE S2: nest attendance in relation to the tide: 
 hours_to_plot <- seq(0,21,3)
 n_hours <- length(hours_to_plot)
-pdf("output/FigS3_nest_tide.pdf",10,4)
+pdf("output/FigS2_nest_tide.pdf",10,4)
 #windows(10,4)
 plotnr=0
 layout(matrix(1:(2*n_hours), nrow=2, byrow=T))
@@ -329,6 +294,7 @@ mtext("Tidal phase",1,outer=T,line=2, cex.lab=1.3)
 mtext("Probability of nest attendance",2,outer=T,line=1.5, cex.lab=1.3)
 legend(3*pi,0.4,c("female","male"), pch=15, col=c("lightcoral","lightskyblue"), xpd=NA, cex=1.5)
 dev.off()
+### END FIGURE S2 ###
 
 ### FIGURE 4 - TIMING OF FORAGING ###
 mean.prop.foraging.sex.hour.tidal.phase <- aggregate(logit_foraging~sex+breeding.phase+tidal_phase_cat+hour_CEST, duration.behaviour.per.bird.hour.tidal.breeding.phase, mean)
@@ -341,13 +307,10 @@ mean.prop.foraging.sex.hour.tidal.phase$upper.CL <- mean.prop.foraging.sex.hour.
 mean.prop.foraging.sex.hour.tidal.phase$prop.foraging <- plogis(mean.prop.foraging.sex.hour.tidal.phase$logit_foraging)
 mean.prop.foraging.sex.hour.tidal.phase$lower.CL <- plogis(mean.prop.foraging.sex.hour.tidal.phase$lower.CL)
 mean.prop.foraging.sex.hour.tidal.phase$upper.CL <- plogis(mean.prop.foraging.sex.hour.tidal.phase$upper.CL)
-
 mean.prop.foraging.sex.hour.tidal.phase$diel_rad = mean.prop.foraging.sex.hour.tidal.phase$hour_CEST/24*2*pi
 
 # predict using link function, then calculate 95% CI and then translate to real (response) scale:
 pd.bam.link = predict(bam.foraging.bxsxdxt.REML, newdata=df.diel.tide.sex.phase, type='link', se.fit=T, exclude=c('s(birdID)','s(year)'))
-#windows(6,8)
-#plot(bam.foraging.bxsxdxt.REML)
 pd.bam.link$li = pd.bam.link$fit-1.96*pd.bam.link$se.fit
 pd.bam.link$ui = pd.bam.link$fit+1.96*pd.bam.link$se.fit
 pd.bam.link$fit.real = plogis(pd.bam.link$fit)
@@ -357,64 +320,20 @@ df.diel.tide.sex.phase$fit.real <- pd.bam.link$fit.real
 df.diel.tide.sex.phase$li.real <- pd.bam.link$li.real
 df.diel.tide.sex.phase$ui.real <- pd.bam.link$ui.real
 
-### FIGURE 4 ###
-pdf("output/Fig4_low_high.pdf",10,12)
-#windows(10,14)
-plotnr=0
-layout(matrix(1:10, nrow=5, byrow=T))
-par(mar=c(1,1,0,0), oma=c(4,4,3,12))
-for (breeding.phase in c('1.pre-breeding','3.eggs','4.chicks','5.post.breeding.successful','6.post.breeding.unsuccessful')) {
-  for (tide in c(pi,0)) {
-    top.panel.text = toupper(tide.table$label[tide.table$tidal_stage_rad==tide])
-    yaxis.text = toupper(breeding.phase.table$label[breeding.phase.table$breeding.phase==breeding.phase])
-    plotnr=plotnr+1
-    df.predict = df.diel.tide.sex.phase[round(df.diel.tide.sex.phase$tidal_stage_rad,2)==round(tide,2) & 
-                                          df.diel.tide.sex.phase$breeding.phase==breeding.phase,]
-    df.predict.F <- df.predict[df.predict$sex=="F",]
-    df.predict.M <- df.predict[df.predict$sex=="M",]
-    df.data = mean.prop.foraging.sex.hour.tidal.phase[mean.prop.foraging.sex.hour.tidal.phase$tidal_phase_cat==tide & 
-                                                        mean.prop.foraging.sex.hour.tidal.phase$breeding.phase==breeding.phase,]
-    df.data.F <- df.data[df.data$sex=="F",]
-    df.data.M <- df.data[df.data$sex=="M",]
-    plot(fit.real~diel_rad, df.predict, xlim=c(-0.05,2*pi), ylim=c(0,1), xaxt='n', yaxt='n', type='n', xaxs='i', yaxs='i')
-    if (breeding.phase=='1.pre-breeding') plot.dark.hours.rad.phase(sunrise_pre, sunset_pre, dusk_pre, dawn_pre)
-    if (breeding.phase=='3.eggs') plot.dark.hours.rad.phase(sunrise_eggs, sunset_eggs, dusk_eggs, dawn_eggs)
-    if (breeding.phase=='4.chicks') plot.dark.hours.rad.phase(sunrise_chicks, sunset_chicks, dusk_chicks, dawn_chicks)
-    if (breeding.phase%in%c('5.post.breeding.successful','6.post.breeding.unsuccessful')) plot.dark.hours.rad.phase(sunrise_post.breeding, sunset_post.breeding, dusk_post.breeding, dawn_post.breeding)
-    polygon(c(df.predict.M$diel_rad, rev(df.predict.M$diel_rad)), c(df.predict.M$ui.real, rev(df.predict.M$li.real)), col=adjustcolor('lightskyblue',alpha=0.7), border=NA) #lightcoral
-    polygon(c(df.predict.F$diel_rad, rev(df.predict.F$diel_rad)), c(df.predict.F$ui.real, rev(df.predict.F$li.real)), col=adjustcolor('lightcoral',0.7), border=NA) #lightcoral
-    lines(fit.real~diel_rad, df.predict.M, col=adjustcolor('lightskyblue4',0.7), lwd=2)
-    lines(fit.real~diel_rad, df.predict.F, col=adjustcolor('coral4',0.7), lwd=2)
-    plotCI(df.data.M$diel_rad-0.01, df.data.M$prop.foraging, li=df.data.M$lower.CL, ui=df.data.M$upper.CL, sfrac=0, gap=0, pch=21, pt.bg='white', col='lightskyblue4', add=T)
-    plotCI(df.data.F$diel_rad+0.01, df.data.F$prop.foraging, li=df.data.F$lower.CL, ui=df.data.F$upper.CL, sfrac=0, gap=0, pch=21, pt.bg='white', col='coral4', add=T)
-    points(df.data.M$diel_rad-0.01, df.data.M$prop.foraging, pch=21, bg='white', col='lightskyblue4')
-    if (plotnr>2*4) axis(1, at=x.labels$diel_rad[c(seq(1,23,5))], labels=x.labels$hour_CEST[c(seq(1,23,5))], cex.axis=1.3)
-    if (plotnr%in%seq(1,10,2)) axis(2, at=seq(0,1,0.2), las=1, cex.axis=1.3)
-    if (plotnr%in%seq(2,10,2)) mtext(yaxis.text, 4, line=1)
-    if (plotnr%in%1:2) mtext(top.panel.text, 3, line=1)
-    box()
-  }  
-}
-mtext("Time of the day (hour in CEST)",1,outer=T,line=2, cex.lab=1.3)
-mtext("Probability of foraging",2,outer=T,line=2.5, cex.lab=1.3)
-legend(2.3*pi,0.25,c("female","male"), pch=15, col=c("lightcoral","lightskyblue"), xpd=NA, cex=1.5)
-dev.off()
-
-# ALTERNATIVE FIGURE 4, using GAMM #
-pdf("output/Fig4.pdf",6,10)
+### START FIGURE 4 ###
+cairo_ps("output/Fig4.eps",width=6,height=10)
 #windows(8,10)
 plotnr=0
 layout(matrix(1:5, nrow=5, byrow=T))
 par(mar=c(1,1,0,0), oma=c(4,4,3,12))
 for (breeding.phase in c('1.pre-breeding','3.eggs','4.chicks','5.post.breeding.successful','6.post.breeding.unsuccessful')) {
-  for (tide in pi) {
     yaxis.text = toupper(breeding.phase.table$label[breeding.phase.table$breeding.phase==breeding.phase])
     plotnr=plotnr+1
-    df.predict = df.diel.tide.sex.phase[round(df.diel.tide.sex.phase$tidal_stage_rad,2)==round(tide,2) & 
+    df.predict = df.diel.tide.sex.phase[round(df.diel.tide.sex.phase$tidal_stage_rad,2)==round(pi,2) & 
                                           df.diel.tide.sex.phase$breeding.phase==breeding.phase,]
     df.predict.F <- df.predict[df.predict$sex=="F",]
     df.predict.M <- df.predict[df.predict$sex=="M",]
-    df.data = mean.prop.foraging.sex.hour.tidal.phase[mean.prop.foraging.sex.hour.tidal.phase$tidal_phase_cat==tide & 
+    df.data = mean.prop.foraging.sex.hour.tidal.phase[mean.prop.foraging.sex.hour.tidal.phase$tidal_phase_cat==pi & 
                                                         mean.prop.foraging.sex.hour.tidal.phase$breeding.phase==breeding.phase,]
     df.data.F <- df.data[df.data$sex=="F",]
     df.data.M <- df.data[df.data$sex=="M",]
@@ -434,17 +353,15 @@ for (breeding.phase in c('1.pre-breeding','3.eggs','4.chicks','5.post.breeding.s
     axis(2, at=seq(0,1,0.2), las=1, cex.axis=1.3)
     mtext(yaxis.text, 4, line=1)
     box()
-  }  
 }
 mtext("Time of the day (hour in CEST)",1,outer=T,line=2, cex.lab=1.3)
 mtext("Probability of foraging during low tide",2,outer=T,line=2.5, cex.lab=1.3)
 legend(2.3*pi,0.25,c("female","male"), pch=15, col=c("lightcoral","lightskyblue"), xpd=NA, cex=1.5)
 dev.off()
+### END FIGURE 4 ###
 
-
-### FIGURE S4: nest attendance in relation to the tide, per hour of the day and breeding phase ###
-pdf("output/FigS4_foraging_vs_tide.pdf",10,6)
-#windows(20,14)
+### FIGURE S3: foraging probability in relation to the diel and tidal phase, per breeding phase
+pdf("output/FigS3_foraging_vs_tide.pdf",10,6)
 plotnr=0
 layout(matrix(1:40, nrow=5, byrow=T))
 par(mar=c(1,1,0,1), oma=c(4,3,3,12))
@@ -474,8 +391,9 @@ mtext("Tidal phase",1,outer=T,line=2, cex.lab=1.3)
 mtext("Probability of foraging",2,outer=T,line=1.5, cex.lab=1.3)
 legend(3*pi,0.6,c("female","male"), pch=15, col=c("lightcoral","lightskyblue"), xpd=NA, cex=1.5)
 dev.off()
+### END FIGURE S3 ###
 
-# PREPARATION FOR FIGURE 7: discussion figure about explanation for large variation in male marine foraging
+# PREPARATION FOR FIGURE 7
 bills.males <- na.omit(birds_prop_for_marine$bill[birds_prop_for_marine$sex=='M'])
 pred.males <- expand.grid(bill=seq(min(bills.males), max(bills.males),1))
 pred.males$pred.mar.for.bill = predict(glmer.marforprob.males.bill, newdata=pred.males, type = "response", re.form = NA)
@@ -485,15 +403,10 @@ birds_prop_for_marine$sexn <- 1
 birds_prop_for_marine$sexn[birds_prop_for_marine$sex=='F'] <- 2
 
 ########### FIGURE 7 #############
-pdf("output/Fig7.pdf", width=8, height=5)
+postscript("output/Fig7.eps", width=8, height=5)
 #windows(8,5)
 plot(prop_for_marine~bill, birds_prop_for_marine, pch=21, bg=c('lightskyblue','lightcoral')[sexn], col=c('lightskyblue4','coral4')[sexn],  cex=2, xlab='Bill length (mm)', ylab='Marine foraging probability', cex.axis=1.2, cex.lab=1.3)
 legend('bottomleft',legend=c('female','male'), pch=21, pt.bg=c('lightcoral','lightskyblue'), col=c('coral4','lightskyblue4'), cex=1.5, pt.cex=2)
 lines(pred.mar.for.bill~bill, pred.males, col='lightskyblue', lwd=2)
 dev.off()
 ####### END OF FIGURE 7 ##########
-
-# plot relationship with tarsus length
-windows(8,5)
-plot(prop_for_marine~tarsus, birds_prop_for_marine, pch=21, bg=c('lightskyblue','lightcoral')[sexn], col=c('lightskyblue4','coral4')[sexn],  cex=2, xlab='Tarsus length (mm)', ylab='Proportion marine foraging', cex.axis=1.2, cex.lab=1.3)
-legend('bottomleft',legend=c('female','male'), pch=21, pt.bg=c('lightcoral','lightskyblue'), col=c('coral4','lightskyblue4'), cex=1.5, pt.cex=2)

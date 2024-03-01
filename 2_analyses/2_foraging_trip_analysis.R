@@ -1,18 +1,11 @@
-# first run the time allocation analysis script
-#keep(gps.breeding.data.behav, bird.data, breeding.data, sure=T)
-
-source("functions.R") # to have the most updated version of the functions
-Sys.setenv(TZ='Europe/Amsterdam') # just to be sure
-
 ### determine a circle of 50 m around the nest, which we here call "colony". If a bird moves outside the colony, we assume it is on a foraging trip (note that resting periods away from the colony are included in the foraging trip):
 gps.breeding.data.behav$at_colony_50m = 0
 gps.breeding.data.behav$at_colony_50m[gps.breeding.data.behav$distance.to.nest<50]=1 
-
 gps.breeding.data.behav$foraging_trip = 0
 
 ### Determine and label individual foraging trips
 ### Important that the data is ordered correctly, on year, bird, date
-gps.breeding.data.behav <- gps.breeding.data.behav[order(gps.breeding.data.behav$year, gps.breeding.data.behav$birdID, gps.breeding.data.behav$date_time),]
+gps.breeding.data.behav <- gps.breeding.data.behav[order(gps.breeding.data.behav$year, gps.breeding.data.behav$birdID, gps.breeding.data.behav$date_time_CEST),]
 
 for(bird in unique(gps.breeding.data.behav$birdID)) {
   ## per year
@@ -39,6 +32,7 @@ for(bird in unique(gps.breeding.data.behav$birdID)) {
     gps.breeding.data.behav$foraging_trip[gps.breeding.data.behav$birdID==bird&gps.breeding.data.behav$year==year] = df.tmp$foraging_trip  
     }
 }
+
 # until now, foraging trips are defined on the basis of leaving the colony, not yet by the fact that birds were also foraging for some time when away from the colony. This is defined below. 
 
 gps.breeding.data.behav$year = as.factor(gps.breeding.data.behav$year)
@@ -47,25 +41,14 @@ df.for.trips = gps.breeding.data.behav[gps.breeding.data.behav$foraging_trip>0,]
 
 df.for.trips.34 = df.for.trips[df.for.trips$breeding.phase=='3.eggs'|df.for.trips$breeding.phase=='4.chicks',]
 
-# check in which habitats foraging was estimated to happen: 
-table(df.for.trips.34$habitat[df.for.trips.34$behaviour=='foraging'])
-# we did not use this criteria: foraging here is also possible on the Schier_Kwelder for example... 
-# however, birds, and particularly males, often make short trips on the saltmarsh to search for nestmaterial. 
-table(df.for.trips.34$habitat[df.for.trips.34$foraging==1]) # however, in the time allocation analysis script, we used the criterium that we assumed a bird was foraging when it was estimated to be foraging on the basis of acc data AND was located in foraging habitat (water)
-
-df.for.trips.34$foraging_freshwater = df.for.trips.34$foraging - df.for.trips.34$foraging_marine
-# duration presence on the mainland:
-df.for.trips.34$on_mainland = ifelse(df.for.trips.34$habitat_type=='mainland',1,0)
-
 max.distance.year.bird.trip = aggregate(distance.to.nest/1000 ~ year + birdID + foraging_trip, data=df.for.trips.34, max) 
 names(max.distance.year.bird.trip)[4]<-'distance.to.nest'
 df.for.trips.34$freq=1
-foraging.sums.per.trip = aggregate(cbind(freq, foraging, foraging_marine, foraging_freshwater, on_mainland)~year+birdID+foraging_trip, data=df.for.trips.34, sum) # breeding phase is removed, as a foraging trip can cover the switch from egg to chick phase, or from chick to postfledging... Later, the breeding phases will be coupled again. Here, the info on whether a bird was actually foraging is calculated. 
-start_time_of_trips = aggregate(date_time~year+birdID+foraging_trip, data=df.for.trips.34, min) # we assume the trip starts at the first location outside the colony, because otherwise (if 0.5*time_to_previous is substracted) the start of the trip sometimes ends up in a yday that is excluded from analysis because it has less than 23.5 hours of duration data.  
+foraging.sums.per.trip = aggregate(cbind(freq, foraging)~year+birdID+foraging_trip, data=df.for.trips.34, sum) # breeding phase is removed, as a foraging trip can cover the switch from egg to chick phase, or from chick to postfledging... Later, the breeding phases will be coupled again. Here, the info on whether a bird was actually foraging is calculated. 
+start_time_of_trips = aggregate(date_time_CEST~year+birdID+foraging_trip, data=df.for.trips.34, min) # we assume the trip starts at the first location outside the colony, because otherwise (if 0.5*time_to_previous is substracted) the start of the trip sometimes ends up in a yday that is excluded from analysis because it has less than 23.5 hours of duration data.  
 names(start_time_of_trips)[4] = 'start_time'
 # other info at the start of the foraging trip:
-#other_start_info_trips = aggregate(yday_CEST~year+birdID+foraging_trip, data=df.for.trips.34, min) # we assume 
-end_time_of_trips = aggregate(date_time~year+birdID+foraging_trip, data=df.for.trips.34, max) # we assume the trip ends at the last sample outside the colony. We then add 30 minutes, to account for the fact that on average, the individual departed 15 minutes prior to the first sample outside the colony and returned on average 15 minutes after the last sample outside the colony.  
+end_time_of_trips = aggregate(date_time_CEST~year+birdID+foraging_trip, data=df.for.trips.34, max) # we assume the trip ends at the last sample outside the colony. We then add 30 minutes, to account for the fact that on average, the individual departed 15 minutes prior to the first sample outside the colony and returned on average 15 minutes after the last sample outside the colony.  
 names(end_time_of_trips)[4] = 'end_time'
 trips.start.end <- cbind(start_time_of_trips, end_time=end_time_of_trips$end_time)
 trips.start.end$yday_start <- yday(trips.start.end$start_time)
@@ -74,10 +57,7 @@ trips.start.end$trip.duration <- round(difftime(trips.start.end$end_time, trips.
 # check that aggregate functions were done in the same order:
 table(trips.start.end$birdID==foraging.sums.per.trip$birdID)
 table(trips.start.end$birdID==max.distance.year.bird.trip$birdID)
-#table(trips.start.end$birdID==other_start_info_trips$birdID)
-#trip.info <- cbind(trips.start.end, other_start_info_trips[,c('day_rel_hatching','week_rel_hatching','week')], foraging.sums.per.trip[,c('freq','foraging', 'foraging_marine', 'foraging_freshwater', 'on_mainland')], distance.to.nest=max.distance.year.bird.trip$distance.to.nest)
-#trip.info <- merge(merge(merge(trips.start.end, other_start_info_trips[,c('foraging_trip','day_rel_hatching','week_rel_hatching','week')]), foraging.sums.per.trip[,c('foraging_trip','freq','foraging', 'foraging_marine', 'foraging_freshwater', 'on_mainland')]), max.distance.year.bird.trip[,c('foraging_trip','distance.to.nest')]) # should produce the same, but takes much longer...
-trip.info <- cbind(trips.start.end, foraging.sums.per.trip[,c('freq','foraging', 'foraging_marine', 'foraging_freshwater', 'on_mainland')], distance.to.nest=max.distance.year.bird.trip$distance.to.nest)
+trip.info <- cbind(trips.start.end, foraging.sums.per.trip[,c('freq','foraging')], distance.to.nest=max.distance.year.bird.trip$distance.to.nest)
 
 ## only use trips where the bird was actually foraging for some time:
 trip.info.sel <- trip.info[trip.info$foraging>0,] # 3160 trips left from 4295
@@ -107,31 +87,10 @@ dim(trip.info.sel2) # N=3120 trips left
 df.for.trips <- trip.info.sel2
 df.for.trips$breeding.phase <- factor(df.for.trips$breeding.phase)
 df.for.trips$trip.duration <- as.numeric(df.for.trips$trip.duration)
-
-# calculate proportion of marine vs freshwater foraging during foraging trip:
-df.for.trips$prop_foraging_marine <- df.for.trips$foraging_marine/df.for.trips$foraging
-df.for.trips$prop_foraging_freshwater <- df.for.trips$foraging_freshwater/df.for.trips$foraging
-df.for.trips$marine.trip <- ifelse(df.for.trips$prop_foraging_marine>0.5,1,0)
-
-# assess the proportion of foraging in marine/brackish and freshwater foraging trips: 
-windows()
-hist(df.for.trips$prop_foraging_marine, breaks=20, xlab='proportion of foraging marine', ylab="total number of trips", ylim=c(0,2500), main="") # shows mainly
-windows()
-hist(df.for.trips$prop_foraging_fresh, breaks=20, xlab='prop foraging freshwater', main='Distribution of proportion freshwater per foraging trip', ylim=c(0,2500)) # this is now logically exactly the opposite pattern as that of prop marine foraging. (as brackish foraging is pooled with marine foraging)
-
 df.for.trips$hour_end = hour(df.for.trips$end_time)
 df.for.trips$yday_start = yday(df.for.trips$start_time)
 df.for.trips$yday_end = yday(df.for.trips$end_time)
 df.for.trips$year = as.factor(df.for.trips$year)
-df.for.trips$prop_foraging <- df.for.trips$foraging/df.for.trips$freq
-
-# plot the distribution of foraging trip distances for females and males:
-windows()
-layout(1:2)
-par(mar=c(1,5,4,1), oma=c(4,0,0,0))
-multhist(list(df.for.trips$distance.to.nest[df.for.trips$sex=="F"&df.for.trips$marine.trip==1], df.for.trips$distance.to.nest[df.for.trips$sex=="F"&df.for.trips$marine.trip==0]), col=c("blue","lightblue"), breaks=0:24, names.arg=0:23, xlab="Foraging trip distance", ylab="Frequency", main="Females")
-multhist(list(df.for.trips$distance.to.nest[df.for.trips$sex=="M"&df.for.trips$marine.trip==1], df.for.trips$distance.to.nest[df.for.trips$sex=="M"&df.for.trips$marine.trip==0]), col=c("blue","lightblue"), breaks=0:24, names.arg=0:23, xlab="Foraging trip distance", ylab="Frequency", main="Males")
-mtext("Foraging trip distance (km)",1,2,outer=T)
 
 ### STATISTICS ###
 
@@ -152,10 +111,9 @@ names(n_trips_day_bird_year_zeros)[7]='n_trips'
 # using the number of foraging trips per date per bird as statistical unit
 var(n_trips_day_bird_year_zeros$n_trips)/mean(n_trips_day_bird_year_zeros$n_trips) # 0.58, no overdispersion. 
 hist(n_trips_day_bird_year_zeros$n_trips, breaks=8)
-m_n_for_trips  = glmer(n_trips~breeding.phase*sex+(1|birdID)+(1|year), data=n_trips_day_bird_year_zeros, family="poisson", na.action='na.fail') # cross random effects of year and bird
+m_n_for_trips  = glmer(n_trips~breeding.phase*sex+(1|birdID)+(1|year), data=n_trips_day_bird_year_zeros, family="poisson", na.action='na.fail')
 summary(m_n_for_trips)
-
-model.sel.n.trips = dredge(m_n_for_trips) # most parsimonious model includes additive effect of sex and breeding phase
+model.sel.n.trips = dredge(m_n_for_trips)
 m.pars.n.trips = get.models(model.sel.n.trips,1)[[1]]
 emmeans.n.trips <- emmeans(m_n_for_trips, pairwise~breeding.phase*sex, regrid='response')
 emmeans.n.trips$contrasts # all pairwise comparisons are significant, except eggs F vs chicks M. 
@@ -183,7 +141,7 @@ plot( m_for.trip.dur, resid(., type = "p") ~ fitted(.) | breeding.phase * sex )
 # as the distribution of trip durations is right skewed, we use a gamma distribution:
 hist(df.for.trips$trip.duration) # right skewed distribution... (many short trips)
 m_for.trip.dur.gamma  = glmer(trip.duration~breeding.phase*sex+(1|birdID)+(1|year), data=df.for.trips, family=Gamma("inverse"), na.action="na.fail")
-model.sel.for.trip.dur.gamma = dredge(m_for.trip.dur.gamma) # interaction between sex and breeding phase is best supported; why are 7 parameters counted in the full model, instead of 6? Is this because the estimate of "residual variation" is added for the Gamma or normal distribution, but not for the Poisson distribution (as residual variation can be calculated (rather than estimated) for a Poisson distribution). 
+model.sel.for.trip.dur.gamma = dredge(m_for.trip.dur.gamma) 
 m.pars.for.trip.dur = get.models(model.sel.for.trip.dur.gamma,1)[[1]]
 summary(m.pars.for.trip.dur)
 emmeans.for.trip.dur <- emmeans(m.pars.for.trip.dur, pairwise~breeding.phase*sex, type='response')
@@ -225,8 +183,8 @@ dist.trips.pairs$sign = ifelse(dist.trips.pairs$p.value<0.001, "***",
                               ifelse(dist.trips.pairs$p.value<0.01, "**",
                                      ifelse(dist.trips.pairs$p.value<0.05, "*", "n.s.")))
 
-# Save the different tables into subtables to combine as Table 4:
-write.csv(make.table.from.dredge.output(model.sel.n.trips), "output/Table2a - Foraging trip number 30 min.csv")
-write.csv(make.table.from.dredge.output(model.sel.for.trip.dur.gamma), "output/Table2b - Foraging trip duration 30 min.csv")
-write.csv(make.table.from.dredge.output(model.sel.for.trip.distance), "output/Table2c - Foraging trip distance 30 min.csv")
+# Save the different tables into subtables to combine as Table 2:
+write.csv(make.table.from.dredge.output(model.sel.n.trips), "output/Table2a - Foraging trip number.csv")
+write.csv(make.table.from.dredge.output(model.sel.for.trip.dur.gamma), "output/Table2b - Foraging trip duration.csv")
+write.csv(make.table.from.dredge.output(model.sel.for.trip.distance), "output/Table2c - Foraging trip distance.csv")
 # the models using the poisson distribution count one parameter less, as the variance is not estimated but calculated. 
