@@ -1,12 +1,7 @@
-## Enter your Movebank username and password:
+# enter your Movebank username and password:
 loginStored <- movebankLogin(username="xxxx", password="xxxx")
 
-# search for study name with keywords:
-searchMovebankStudies("poonbill", login=loginStored) # this gives different results than when searching in Movebank itself... Moreover, it is case sensitive. Therefore, remove first letter to see both ways of writing.
-
-# if an error message is thrown with "Timeout was reached" in it, this means that data traffic at www.movebank.org is currently too heavy. Try again later.
-
-## The below line only works if you have persmission to download the study (data). To get permission, contact the data owner. 
+# the below line only works if you have persmission to download the study (data). To get permission, contact the data owner. 
 spoonbill_metawad_ID <- getMovebankID("SPOONBILL_METAWAD - Eurasian Spoonbills (Platalea leucorodia, Threskiornithidae) breeding on Schiermonnikoog, The Netherlands", login=loginStored)
 
 # import bird data to import Movebank data seperately per individual
@@ -17,7 +12,7 @@ bird.data$end_deployment <- dmy(bird.data$end_deployment, tz='UTC')
 bird.data$year.end <- year(bird.data$end_deployment)
 birds = bird.data$birdID
 
-# Set system time zone 
+# set system time zone 
 Sys.setenv(TZ="GMT")
 
 # make a loop to load and process GPS and ACC data per bird and save data in a list:
