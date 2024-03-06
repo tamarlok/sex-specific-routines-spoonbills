@@ -3,11 +3,9 @@ cols.behaviour2.pooled = c('chartreuse4','gold','gold','gold','orange','red','bl
 breeding.phase.cols = c('grey','white','darkorange','dodgerblue','darkolivegreen3','red') # colours for the different breeding.phases for plotting
 
 # number of bird days:
-birddays <- unique(gps.breeding.data.behav[,c('birdID','year','yday_CEST','month','breeding.phase','breeding.phase2')])
+birddays <- unique(gps.breeding.data.behav[,c('birdID','year','yday_CEST','breeding.phase','breeding.phase2')])
 dim(birddays) # 3115 birddays with nearly complete data (47 or 48 samples per 24h)
 length(table(gps.breeding.data.behav$birdyear)) # 41 birdyears
-table(birddays$breeding.phase)
-table(birddays$birdID, birddays$month, birddays$year)
 # sample size per bird year and breeding phase:
 sample_size_birdyear_phase = as.data.frame(table(paste(birddays$birdID, birddays$year, sep="_"), birddays$breeding.phase2))
 names(sample_size_birdyear_phase)=c('birdyear','breeding.phase2','ndays')
@@ -141,7 +139,15 @@ mean.prop.at.nest.sex.hour.tidal.phase$lower.CL <- plogis(mean.prop.at.nest.sex.
 mean.prop.at.nest.sex.hour.tidal.phase$upper.CL <- plogis(mean.prop.at.nest.sex.hour.tidal.phase$upper.CL)
 
 # calculate mean periods of night, dusk, dawn and day for the different breeding periods:
-
+# add sunset, sunrise, dusk and dawn (which is location-specific, but varies very little between locations as they are very close):
+coordinates(gps.breeding.data.behav)  <- ~longitude + latitude  # to make it a spatialpoints dataframe
+gps.breeding.data.behav$sunrise=sunriset(coordinates(gps.breeding.data.behav), gps.breeding.data.behav$date_time_CEST, POSIXct.out=TRUE, direction="sunrise")[,2]
+gps.breeding.data.behav$sunset=sunriset(coordinates(gps.breeding.data.behav), gps.breeding.data.behav$date_time_CEST, POSIXct.out=TRUE, direction="sunset")[,2]
+gps.breeding.data.behav$dusk=crepuscule(coordinates(gps.breeding.data.behav), gps.breeding.data.behav$date_time_CEST, solarDep = 6,POSIXct.out=TRUE, direction="dusk")[,2]
+gps.breeding.data.behav$dawn=crepuscule(coordinates(gps.breeding.data.behav), gps.breeding.data.behav$date_time_CEST, solarDep = 6, POSIXct.out=TRUE, direction="dawn")[,2]
+# turn back into data frame:
+gps.breeding.data.behav <- as.data.frame(gps.breeding.data.behav)
+# calculate average time of sunset, sunrise, dusk and dawn per breeding phase:
 sunset_pre <- seconds_to_period(mean(hms::as_hms(gps.breeding.data.behav$sunset[gps.breeding.data.behav$breeding.phase=='1.pre-breeding'])))
 sunrise_pre <- seconds_to_period(mean(hms::as_hms(gps.breeding.data.behav$sunrise[gps.breeding.data.behav$breeding.phase=='1.pre-breeding'])))
 dawn_pre <- seconds_to_period(mean(hms::as_hms(gps.breeding.data.behav$dawn[gps.breeding.data.behav$breeding.phase=='1.pre-breeding'])))

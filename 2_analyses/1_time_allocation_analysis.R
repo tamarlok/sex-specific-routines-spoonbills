@@ -1,14 +1,53 @@
-gps.breeding.data.behav$birdyear = as.factor(paste(gps.breeding.data.behav$birdID, gps.breeding.data.behav$year, sep="_"))
-gps.breeding.data.behav = gps.breeding.data.behav[order(gps.breeding.data.behav$birdID, gps.breeding.data.behav$date_time_CEST),]
-
-# remove NA's: (this was already done, as no rows are removed after running the below line)
-gps.breeding.data.behav <- na.omit(gps.breeding.data.behav[,c('birdID','birdyear','date_time_30min_CEST','date_time_CEST','longitude','latitude','yday_CEST','hour_CEST','month','week','daynight','twilight_day_night','sunset','sunrise','dusk','dawn','habitat','habitat_type','habitat_salinity','land_water','hatch_day','day_rel_hatching','week_rel_hatching','breeding.phase','breeding.phase2','breeding.phase.nr','sex','behaviour','behaviour2', 'lat.nest','lon.nest','distance.to.nest','at_nest','foraging','foraging_marine','year','diel_rad','tidal_stage_rad')])
-gps.breeding.data.behav$hour_f <- as.factor(gps.breeding.data.behav$hour_CEST)
 gps.breeding.data.behav$sex <- as.factor(gps.breeding.data.behav$sex)
 gps.breeding.data.behav$birdID <- as.factor(gps.breeding.data.behav$birdID)
 gps.breeding.data.behav$year <- as.factor(gps.breeding.data.behav$year)
 gps.breeding.data.behav$breeding.phase <- as.factor(gps.breeding.data.behav$breeding.phase)
+
+# (re)calculate additional columns
+gps.breeding.data.behav$birdyear = as.factor(paste(gps.breeding.data.behav$birdID, gps.breeding.data.behav$year, sep="_"))
+gps.breeding.data.behav$yday_CEST = yday(gps.breeding.data.behav$date_time_CEST)
+gps.breeding.data.behav$hour_CEST = hour(gps.breeding.data.behav$date_time_CEST)
+gps.breeding.data.behav$hour_f <- as.factor(gps.breeding.data.behav$hour_CEST)
 gps.breeding.data.behav$sexxbp = interaction(gps.breeding.data.behav$sex, gps.breeding.data.behav$breeding.phase)
+gps.breeding.data.behav$breeding.phase.nr = as.numeric(substr(gps.breeding.data.behav$breeding.phase,1,1))
+
+# other categorizations of habitat:
+# categorize habitats as schier, mainland, wadden, or rest:
+gps.breeding.data.behav$habitat_type = 'schier'
+gps.breeding.data.behav$habitat_type[gps.breeding.data.behav$habitat=='LM_zoet'|gps.breeding.data.behav$habitat=='LM_land'|gps.breeding.data.behav$habitat=='wal_rest_zoet'|gps.breeding.data.behav$habitat=='wal_rest_land'] ='mainland'
+gps.breeding.data.behav$habitat_type[gps.breeding.data.behav$habitat=='waddenzee'|gps.breeding.data.behav$habitat=='Wad_Kweldergeul_Brak'] ='wadden'
+gps.breeding.data.behav$habitat_type[gps.breeding.data.behav$habitat=='Eilanden_Rest'|gps.breeding.data.behav$habitat=='Noordzee'] ='rest'
+gps.breeding.data.behav$habitat_type[is.na(gps.breeding.data.behav$habitat)] = NA
+
+# categorize habitats as marine, brackish, freshwater, land, or NA
+gps.breeding.data.behav$habitat_salinity = NA
+gps.breeding.data.behav$habitat_salinity[gps.breeding.data.behav$habitat=='Schier_Kwelder'|gps.breeding.data.behav$habitat=='wal_rest_land'|gps.breeding.data.behav$habitat=='LM_land'|gps.breeding.data.behav$habitat=='Schier_Land_Rest'|gps.breeding.data.behav$habitat=='Eilanden_Rest'] = 'land'
+gps.breeding.data.behav$habitat_salinity[gps.breeding.data.behav$habitat=='waddenzee'|gps.breeding.data.behav$habitat=="Noordzee"] = 'marine'
+gps.breeding.data.behav$habitat_salinity[gps.breeding.data.behav$habitat=='Schier_brak'|gps.breeding.data.behav$habitat=='Wad_Kweldergeul_Brak'] = 'brackish'
+gps.breeding.data.behav$habitat_salinity[gps.breeding.data.behav$habitat=='LM_zoet'|gps.breeding.data.behav$habitat=='wal_rest_zoet'|gps.breeding.data.behav$habitat=='Schier_Zoet'] = 'freshwater'
+
+# make column "behaviour2" that combines behaviour with habitat:
+gps.breeding.data.behav$behaviour2 = gps.breeding.data.behav$behaviour
+gps.breeding.data.behav$behaviour2[gps.breeding.data.behav$behaviour=='foraging'] = paste(gps.breeding.data.behav$behaviour[gps.breeding.data.behav$behaviour=='foraging'], gps.breeding.data.behav$habitat_salinity[gps.breeding.data.behav$behaviour=='foraging'], sep='_')
+gps.breeding.data.behav$behaviour2[gps.breeding.data.behav$behaviour=='resting'] = paste(gps.breeding.data.behav$behaviour[gps.breeding.data.behav$behaviour=='resting'], gps.breeding.data.behav$habitat_type[gps.breeding.data.behav$behaviour=='resting'], sep='_')
+gps.breeding.data.behav$behaviour2[gps.breeding.data.behav$distance.to.nest<5] = 'at_nest'
+
+# turn foraging_land into "other"  
+gps.breeding.data.behav$behaviour2[gps.breeding.data.behav$behaviour2=="foraging_land"] <- "other" 
+
+# create second breeding phase column in which post-breeding successful and unsuccessful are pooled:
+gps.breeding.data.behav$breeding.phase2 <- as.character(gps.breeding.data.behav$breeding.phase)
+gps.breeding.data.behav$breeding.phase2[gps.breeding.data.behav$breeding.phase.nr==5|gps.breeding.data.behav$breeding.phase.nr==6] <- "5.post-breeding"
+
+### add binary columns for whether bird is attending the nest, foraging or foraging in marine water: 
+gps.breeding.data.behav$at_nest <- 0
+gps.breeding.data.behav$at_nest[gps.breeding.data.behav$behaviour2=='at_nest'] <- 1
+gps.breeding.data.behav$foraging <- 0
+gps.breeding.data.behav$foraging[gps.breeding.data.behav$behaviour2=='foraging_freshwater'|gps.breeding.data.behav$behaviour2=='foraging_brackish'|gps.breeding.data.behav$behaviour2=='foraging_marine'] <- 1 # only foraging in water (not on land) is considered as foraging
+gps.breeding.data.behav$foraging_marine <- 0
+gps.breeding.data.behav$foraging_marine[gps.breeding.data.behav$behaviour2=='foraging_brackish'|gps.breeding.data.behav$behaviour2=='foraging_marine'] <- 1
+
+# create df with only data during the incubation and chick-rearing phase:
 gps.breeding.data.behav.phase34 <- gps.breeding.data.behav[gps.breeding.data.behav$breeding.phase%in%c('3.eggs','4.chicks'),]
 
 # Statistical analysis

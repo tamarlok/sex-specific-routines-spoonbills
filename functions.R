@@ -7,68 +7,6 @@ ipak <- function(pkg){
   sapply(pkg, require, character.only = TRUE)
 }
 
-### Functions to import tracking data from UvA-BiTS website ###
-# make R data file
-ImportGPSDataBird <- function(birdID, date_start, date_end) {
-  df <- sqlQuery(db, query = paste("SELECT device_info_serial,  
-                                     date_time, longitude,
-                                     latitude,altitude,speed_2d, gps_fixtime FROM gps.ee_tracking_speed_limited 
-                                     WHERE device_info_serial = ",birdID,"AND  date_time >= '" , as.POSIXct(date_start, origin='1970-01-01', tz="UTC"),
-                                   "' AND date_time <= '", as.POSIXct(date_end, origin='1970-01-01', tz="UTC"), "'", sep = ''))
-  df[order(df$date_time),]
-}
-
-ImportAllGPSDataBird <- function(birdID, date_start, date_end) {
-  df <- sqlQuery(db, query = paste("SELECT * FROM gps.ee_tracking_speed_limited 
-                                     WHERE device_info_serial = ",birdID,"AND  date_time >= '" , as.POSIXct(date_start, origin='1970-01-01', tz="UTC"),
-                                   "' AND date_time <= '", as.POSIXct(date_end, origin='1970-01-01', tz="UTC"), "'", sep = ''))
-  df[order(df$date_time),]
-}
-
-
-ImportSMSDataBird <- function(birdID, date_start, date_end) {
-  df <- sqlQuery(db, query = paste("SELECT device_info_serial,  
-                                     date_time, longitude,
-                                     latitude FROM gps.ee_sms_position_limited
-                                     WHERE device_info_serial = ",birdID,"AND  date_time >= '" , as.POSIXct(date_start, origin='1970-01-01', tz="UTC"),
-                                   "' AND date_time <= '", as.POSIXct(date_end, origin='1970-01-01', tz="UTC"), "'", sep = ''))
-  df[order(df$date_time),]
-}
-
-ImportAccDataBird <- function(birdID, date_start, date_end) {
-  df <- sqlQuery(db, query = paste("SELECT device_info_serial,  
-                                   date_time, index, x_acceleration, y_acceleration, z_acceleration FROM gps.ee_acceleration_limited 
-                                   WHERE device_info_serial = ",birdID,"AND  date_time >= '" , as.POSIXct(date_start, origin='1970-01-01', tz="UTC"),
-                                   "' AND date_time <= '", as.POSIXct(date_end, origin='1970-01-01', tz="UTC"), "'", sep = ''))
-  df[order(df$date_time),]
-}
-
-ImportAllAccDataBird <- function(birdID, date_start, date_end) {
-  df <- sqlQuery(db, query = paste("SELECT * FROM gps.ee_acceleration_limited 
-                                   WHERE device_info_serial = ",birdID,"AND  date_time >= '" , as.POSIXct(date_start, origin='1970-01-01', tz="UTC"),
-                                   "' AND date_time <= '", as.POSIXct(date_end, origin='1970-01-01', tz="UTC"), "'", sep = ''))
-  df[order(df$date_time),]
-}
-
-ImportCOMDataBird <- function(birdID, date_start, date_end) {
-  df <- sqlQuery(db, query = paste("SELECT device_info_serial,  
-                                   date_time, vbat, longitude,
-                                   latitude FROM gps.ee_comm_limited 
-                                   WHERE device_info_serial = ",birdID,"AND  date_time >= '" , as.POSIXct(date_start, origin='1970-01-01', tz="UTC"),
-                                   "' AND date_time <= '", as.POSIXct(date_end, origin='1970-01-01', tz="UTC"), "'", sep = ''))
-  na.omit(df[order(df$date_time),])
-}
-
-ImportTrackerInfo <- function(birdID) {
-  df <- sqlQuery(db, query = paste("SELECT device_info_serial, firmware_version, mass, start_date, end_date, x_o, x_s, y_o, y_s, z_o, z_s, tracker_id FROM gps.ee_tracker_limited 
-                                   WHERE device_info_serial = ",birdID, sep = ''))
-  df
-}
-
-### End of tracking data loading functions
-
-### Functions needed to calculate summary statistics over acceleration segments ###
-
 # Dominant Power Spectrum
 dps <- function(x){
   d.x <- x - mean(x, na.rm = T)   
@@ -102,20 +40,17 @@ noise <- function(x){
   return(noise.mean)
 }
 
-### End of summary statistics function ###
-
-### create fixed segments of acc samples, providing segment length and other options 
-create.fixed.segments <- function(segment.length, data, remove.shorter.segments = TRUE, sampling.freq=20) { # segment length is expressed in seconds
+### create fixed segments of acc samples and calculate summary statistics over them
+create.fixed.segments <- function(segment.length, data, sampling.freq=20) { # segment length is expressed in seconds
   
-  samples.per.segment <- ceiling(segment.length * sampling.freq) # to make it an integer (and select only segments with highest possible number of samples, given the sampling frequency; e.g. for a segment of 0.8 seconds at 2 Hz, this is 2 samples)
-  
-  # 20210617: these two lines are added to include the adjustment of the original sampling frequency (which was 20 Hz) within the creation of fixed segments code:
+  samples.per.segment <- ceiling(segment.length * sampling.freq) 
   indices.to.use <- seq(min(data$Index),max(data$Index),by=20/sampling.freq)
   data.sel = data[data$Index %in% indices.to.use,] 
 
   data.sel$segment.id.cut <- paste(data.sel$obs.id, formatC(format="d", ceiling((data.sel$Index+1)/(segment.length*20)),flag="0",width=ceiling(log10(max(ceiling((data.sel$Index+1)/(segment.length*20)))))), sep = ".") # 20 is the sampling frequency at which the data was originally collected
   
   data.sel <- na.omit(data.sel)
+  
   ## calculate summary statistics for each segment: 
   seg.df <- ddply(data.sel, .(segment.id.cut, birdID, date_time), summarize, 
                   nobs.segments  = length (x), speed_2d = mean(speed_2d),
@@ -133,19 +68,9 @@ create.fixed.segments <- function(segment.length, data, remove.shorter.segments 
   
   seg.df$odba <- seg.df$odba.x + seg.df$odba.y + seg.df$odba.z 
 
-  # If remove.shorter.segments is set at TRUE, then only use the segments of specified segment length for the machine learning and testing: 
-  if (remove.shorter.segments == TRUE) seg.df <- seg.df[seg.df$nobs.segments==samples.per.segment,] 
+  seg.df <- seg.df[seg.df$nobs.segments==samples.per.segment,] # only use segments of the specified segment length
   seg.df
 }
-
-#link.gps.acc.data <- function(gps.data, acc.data, device.info) {
-#  data <- merge(gps.data, acc.data)
-#  data$x <- (data$x_acceleration-device.info$x_o)/device.info$x_s
-#  data$y <- (data$y_acceleration-device.info$y_o)/device.info$y_s
-#  data$z <- (data$z_acceleration-device.info$z_o)/device.info$z_s
-#  data <- na.omit(data[,c('device_info_serial','index','date_time',"longitude","latitude","altitude",'speed_2d','x','y','z')])
-#  data
-#}
 
 from.list.to.df <- function(list) {   # change from list to dataframe
   df <- list[[1]]
@@ -154,9 +79,7 @@ from.list.to.df <- function(list) {   # change from list to dataframe
 }
 
 # function to determine nest coordinates and calculate nest attendance 
-# make the plotting optional, as this is not possible on the NIOZ cluster
 determine.breeding.phases <- function(df, day_hatched=NA, day_hatched2=NA, successful=0) {
-  df=df[df$duration<61,] # only use data with a duration of one hour or less. 
   df <- na.omit(df) # this removes the points for which no habitat info is available, and the first and last point of a bird in each year, as duration could not be calculated (as time_until_previous or time_until_next was NA)
   df$lat_rnd=round(df$latitude, digit=5) 
   df$lon_rnd=round(df$longitude, digit=6) 
@@ -277,90 +200,10 @@ determine.breeding.phases <- function(df, day_hatched=NA, day_hatched2=NA, succe
   df$distance.to.prev[2:dim(df)[1]] = round(distCosine(df[1:(dim(df)[1]-1),c('longitude','latitude')], df[2:dim(df)[1],c('longitude','latitude')], r=6378.137),3)
   df$distance.to.next = c(df$distance.to.prev[2:dim(df)[1]],NA)
   
-  df[,-which(names(df) %in% c("catch.date","lat_rnd","lon_rnd","dist.nest1","nest1.1m","dist.nest2","nest2.1m"))] # code could be rewritten so that these columns are not added to df in the first place. 
+  df[,-which(names(df) %in% c("catch.date","lat_rnd","lon_rnd","dist.nest1","nest1.1m","dist.nest2","nest2.1m"))]
 }
 
-# visualize the nest and kwelder attendance and breeding phases in a plot:
-plot.breeding.phases.and.nest.schier.attendance <- function(x) {
-  windows(8,6)
-  par(mar=c(4.5,4.5,3,12))
-  plot(c(90,250), c(0,24), xlab='Date', ylab='Hours present per date', main=paste('Logger',unique(df$birdID),'in',unique(df$year)), type='n', cex.lab=1.2, xaxt='n')
-  axis(1, c(91, 121, 152, 182, 213, 244), labels=c('1 Apr','1 May', '1 Jun','1 Jul','1 Aug','1 Sep'))
-  ## Plot attempt 1                                                                                                             
-  if( max(phase.doy$attempt==1&phase.doy$breeding.phase=='breeding')==1 ) {
-    breeding1.min = min(phase.doy$yday_CEST[phase.doy$attempt==1&phase.doy$breeding.phase=='breeding'])
-    breeding1.max = max(phase.doy$yday_CEST[phase.doy$attempt==1&phase.doy$breeding.phase=='breeding'])+1 # de '+1' is om de periodes aan 
-    polygon(c(breeding1.min, breeding1.min, breeding1.max, breeding1.max), c(0,24,24,0), col='lightyellow', border=NA)
-  }
-  if( max(phase.doy$attempt==1&phase.doy$breeding.phase=='eggs')==1 ) {
-    eggs1.min = min(phase.doy$yday_CEST[phase.doy$attempt==1&phase.doy$breeding.phase=='eggs'])
-    eggs1.max = max(phase.doy$yday_CEST[phase.doy$attempt==1&phase.doy$breeding.phase=='eggs'])+1
-    polygon(c(eggs1.min, eggs1.min, eggs1.max, eggs1.max), c(0,24,24,0), col='lightblue', border=NA)
-  }
-  if( max(phase.doy$attempt==1&phase.doy$breeding.phase=='chicks')==1 ) {
-    chicks1.min = min(phase.doy$yday_CEST[phase.doy$attempt==1&phase.doy$breeding.phase=='chicks'])
-    chicks1.max = max(phase.doy$yday_CEST[phase.doy$attempt==1&phase.doy$breeding.phase=='chicks'])+1
-    polygon(c(chicks1.min, chicks1.min, chicks1.max, chicks1.max), c(0,24,24,0), col='lightpink', border=NA)
-  }
-  if( max(phase.doy$attempt==1&phase.doy$breeding.phase=='fledglings')==1 ) {
-    fledglings1.min = min(phase.doy$yday_CEST[phase.doy$attempt==1&phase.doy$breeding.phase=='fledglings'])
-    fledglings1.max = max(phase.doy$yday_CEST[phase.doy$attempt==1&phase.doy$breeding.phase=='fledglings'])+1
-    polygon(c(fledglings1.min, fledglings1.min, fledglings1.max, fledglings1.max), c(0,24,24,0), col='plum2', border=NA)
-  }
-  ## Plot attempt 2
-  if( max(phase.doy$attempt==2&phase.doy$breeding.phase=='breeding')==1 ) {
-    breeding2.min = min(phase.doy$yday_CEST[phase.doy$attempt==2&phase.doy$breeding.phase=='breeding'])
-    breeding2.max = max(phase.doy$yday_CEST[phase.doy$attempt==2&phase.doy$breeding.phase=='breeding'])+1
-    polygon(c(breeding2.min, breeding2.min, breeding2.max, breeding2.max), c(0,24,24,0), col='lightyellow', border=NA)
-  }
-  if( max(phase.doy$attempt==2&phase.doy$breeding.phase=='eggs')==1 ) {
-    eggs2.min = min(phase.doy$yday_CEST[phase.doy$attempt==2&phase.doy$breeding.phase=='eggs'])
-    eggs2.max = max(phase.doy$yday_CEST[phase.doy$attempt==2&phase.doy$breeding.phase=='eggs'])+1
-    polygon(c(eggs2.min, eggs2.min, eggs2.max, eggs2.max), c(0,24,24,0), col='lightblue', border=NA)
-  }
-  if( max(phase.doy$attempt==2&phase.doy$breeding.phase=='chicks')==1 ) {
-    chicks2.min = min(phase.doy$yday_CEST[phase.doy$attempt==2&phase.doy$breeding.phase=='chicks'])
-    chicks2.max = max(phase.doy$yday_CEST[phase.doy$attempt==2&phase.doy$breeding.phase=='chicks'])+1
-    polygon(c(chicks2.min, chicks2.min, chicks2.max, chicks2.max), c(0,24,24,0), col='lightpink', border=NA)
-  }
-  if( max(phase.doy$attempt==2&phase.doy$breeding.phase=='fledglings')==1 ) {
-    fledglings2.min = min(phase.doy$yday_CEST[phase.doy$attempt==2&phase.doy$breeding.phase=='fledglings'])
-    fledglings2.max = max(phase.doy$yday_CEST[phase.doy$attempt==2&phase.doy$breeding.phase=='fledglings'])+1
-    polygon(c(fledglings2.min, fledglings2.min, fledglings2.max, fledglings2.max), c(0,24,24,0), col='plum2', border=NA)
-  }
-  lines(hours.on.mainland~yday_CEST, data=hours.on.mainland, pch=19, col='blue', type='l')
-  lines(hours.on.kwelder~yday_CEST, data=hours.on.kwelder, pch=19, col='darkolivegreen4', cex=0.8, type='o')
-  lines(hours.on.nest~yday_CEST, data=nest1.attendance, pch=19, cex=0.8, type='o')
-  #lines(c(day.caught,day.caught),c(0,24))
-  lines(c(date.last.fix,date.last.fix),c(0,24), col='red', lwd=2)
-  
-  if ( nest2.real==1 ) lines(hours.on.nest~yday_CEST, data=nest2.attendance, pch=21, cex=0.8, bg='white', type='o')
-}
-
-# plot nest attendance, potentially in relation to the tide 
-plot.nest.attendance <- function(df, breeding.phase="incubation", add.tide = T) {
-  df$minute <- minute(df$date_time)
-  df$day_min = df$hour_CEST*60+df$minute # here: it makes calculations with hour_CEST and min_CEST which is summertime. 
-  windows()
-  layout(1:30)
-  par(mar=c(0,0,0,0), oma=c(2,3,3,1))
-  for (i in unique(df$yday_CEST)) {
-    df.yday = df[df$yday_CEST==i,]
-    plot(nest1~day_min, df.yday, type='n', xaxt='n', yaxt='n', xaxs='i', yaxs='i',xlim=c(0,1440),ylim=c(0,1)) # xlim=c(0,1440)
-    mtext(unique(paste(day(df.yday$date_time), month(df.yday$date_time),sep="/")), 2, 0.5, las=1, cex=0.8)
-    N <- length(df.yday$day_min) 
-    for (j in 1:(N-1)) polygon(x=c(df.yday$day_min[j],df.yday$day_min[j+1],df.yday$day_min[j+1],df.yday$day_min[j]), y=c(0,0,1,1), col=c('coral1','green')[df.yday$nest1[j]+1], border=NA)
-    if (add.tide==T) {
-      segments(low_tides$day_min[low_tides$yday_CEST==i&low_tides$year==unique(df$year)], y0=0, y1=1, col="yellow", lwd=2)
-      segments(high_tides$day_min[high_tides$yday_CEST==i&high_tides$year==unique(df$year)], y0=0, y1=1, col="blue", lwd=2)
-    }
-  }
-  sex = ifelse(unique(df$sex)=="F","Female","Male")
-  mtext(paste(sex, unique(df$birdID), 'at nest during', breeding.phase, sep=' '), 3,1, outer=T)
-  axis(1,at=60*(0:24),labels=0:24)
-}
-
-# make neat table for MS from dredge output
+# make a neat table for manuscript from dredge output
 make.table.from.dredge.output <- function(dredge_output) {
   table.output <- as.data.frame(dredge_output)
   for (i in 1:dim(table.output)[1]) {
@@ -376,7 +219,6 @@ make.table.from.dredge.output <- function(dredge_output) {
   table.output[,3:5] <- format(round(table.output[,3:5],2), trim=T)
   table.output
 }
-
 
 plot.sign.arrow <- function(x1=1, x2=2, ymin=0, ymax=1, yrel=0.9, sign="***", col="black", fontsize=1.5, dist.text=0.015) {
   arrows(x1,ymin+yrel*(ymax-ymin),x2,ymin+yrel*(ymax-ymin), length=0, code=1, col=col)

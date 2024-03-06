@@ -1,5 +1,6 @@
-# plot the shape file
-load("data/raw/ShapeFileSchier.RData")
+# Plot shapefile of study area
+schier_new84_sel <- readOGR(dsn = "data/raw/study_area_shapefile/study_area.shp")
+
 ColHabitats = c('grey60','forestgreen','darkolivegreen','lightblue','lightblue','darkblue',
                 'cyan','darkolivegreen2','cyan','forestgreen','lightblue','cyan','blue',
                 'blue','lightgoldenrod3','darkolivegreen2','forestgreen','darkolivegreen','lightblue','lightblue')
@@ -20,6 +21,7 @@ nest.locations.used <- na.omit(unique(gps.breeding.data.behav[,c('birdID','year'
 
 ############# FIGURE 1 ######################
 postscript("output/Fig1.eps",width=11,height=6)
+# windows(11,6)
 par(oma=c(0,0,1,11), mar=c(3,3,0,0))
 plot(schier_new84_sel, axes=TRUE, border=NA, col = ColHabitats[schier_new84_sel$HabitatNr], xlim=c(5.9,6.6), ylim=c(53.30,53.57))
 legend(6.66,53.56, habitat_types$HabitatsMapped, pch=22, pt.bg=habitat_types$ColHabitats, xpd=NA)
@@ -39,11 +41,13 @@ rasterImage(map_NL, 6.65, 53.3, 6.8, 53.4, xpd=NA)
 dev.off()
 ########### END FIGURE 1 in TIFF ############
 
-rm(schier_new84_sel)
+rm(schier_new84_sel) # to save memory
 
-## plot the breeding phases (excluding the unspecified 'breeding') and days with complete data (48 samples per bird) over the season per bird and per year:
+## plot the breeding phases and days with nearly complete data (47-48 samples per bird) over the season per bird and per year:
 
 # number of birddays per bird with nearly complete data:
+gps.breeding.data.behav$freq=1
+N_yday_birdID_year_sel <- aggregate(freq~year+birdID+sex+yday_CEST+breeding.phase+breeding.phase.nr, gps.breeding.data.behav, sum) 
 table(N_yday_birdID_year_sel$birdID, N_yday_birdID_year_sel$sex) # 9 females; 13 males
 n_years_bird = table(N_yday_birdID_year_sel$birdID, N_yday_birdID_year_sel$year) 
 n_years_bird[n_years_bird>1]<-1
@@ -77,15 +81,10 @@ for (i in 1:dim(birdyears)[1]) {
 dev.off()
 ############# END FIGURE S1 ########################
 
-# check if gaps are correctly visualised in the figure. Example 6298 in 2018. It seems that 1 day is missing during incubation and chick-rearing, and two adjacent days during post-breeding. 
-df.6298.2018 = N_yday_birdID_year_sel[N_yday_birdID_year_sel$birdID==6298 & N_yday_birdID_year_sel$year==2018,]
-# missing days: eggs (150,151,156), chicks (170,171,176) and postbreeding (187,188,189,191,197,200)
-
-
 ### Make density map of foraging locations of males and females:
 # round longitude to nearest 0.005
 gps.breeding.data.behav$lon.rnd <- round(gps.breeding.data.behav$longitude/0.005)*0.005
-# round latitude to nearest 0.002 (which produces more or less squares on the map)
+# round latitude to nearest 0.002
 gps.breeding.data.behav$lat.rnd <- round(gps.breeding.data.behav$latitude/0.003)*0.003
 gps.breeding.data.behav$breeding.phase3 <- substr(as.character(gps.breeding.data.behav$breeding.phase),3,15)
 foraging.data.per.coordrnd <- aggregate(foraging~lat.rnd+lon.rnd+sex+breeding.phase+breeding.phase3, gps.breeding.data.behav[gps.breeding.data.behav$foraging==1,], sum)
