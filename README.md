@@ -4,8 +4,8 @@ Reference Information
 * Authors: 			Tamar Lok, M. van der Geest, P. de Goeij, E. Rakhimberdiev, T. Piersma
 * Datapackage Title: 		Data for the article "Sex-specific nest attendance rhythm and foraging habitat use in a colony-breeding waterbird"
 * Institutes:			NIOZ Royal Netherlands Institute for Sea Research and University of Groningen
-* Study area:			Schiermonnikoog (53°29’N, 6°15’E) and surrounding foraging grounds
-* Study period:			2012-2019
+* Study area:			Schiermonnikoog (53°29’N, 6°15’E) and surrounding foraging grounds, The Netherlands
+* Study period:			May 2012 - September 2019
 * Persistent Identifier:	https://doi.org/xxxx/zenodo.xxxx
 * Date of Issue:		2024-03-08
 
@@ -125,14 +125,14 @@ Details for: gps.breeding.data.behav.csv
 	* date_time_CEST: date and time in CEST (Europe/Amsterdam summertime)	
 	* longitude: longitude (decimal degrees, WGS84)
 	* latitude: latitude (decimal degrees, WGS84)
-	* habitat: habitat type based on the study_area_shapefile habitats as described under the datafolder 'shapefile_study_area'. In this file, the following habitat types are distinguished: 
+	* habitat: habitat type based on the habitats as described under the datafolder 'study_area_shapefile' containing the shapefile of the study area. Some habitat types consist of a combination of habitats as defined in the shapefile: 
 		* waddenzee=Wadgeulen_Diep+Wadgeulen_Ondiep+Wadplaten+Wad_Kweldergeul_Brak (Wadden Sea)
 		* Schier_brak=Schier_Kweldergeul_Brak+Schier_Brak_Rest (brackish water on Schiermonnikoog)
 		* wal_rest_zoet=Wal_Zoet_Ondiep+Wal_Zoet_Diep (freshwater on mainland except Lauwersmeer)
 		* wal_rest_land=Wal_Kwelder+Wal_Land_Rest (land on mainland expect Lauwersmeer)
 		* LM_land=LG_Land_Rest+LG_Moeras (land within Lauwersmeer)
 		* LM_zoet=LG_Zoet_Ondiep_LG_Zoet_Diep (freshwater within Lauwersmeer)
-	* breeding.phase: 3.eggs=incubating eggs, 4.chicks=rearing chicks, 5.post.breeding.successful=post-breeding phase with at least one chick surviving until colour-ringing, 6.post.breeding.unsuccessful=post-breeding phase after unsuccessful breeding attempt
+	* breeding.phase: 1.pre-breeding=pre-breeding phase, 3.eggs=egg incubation phase, 4.chicks=chick-rearing phase, 5.post.breeding.successful=post-breeding phase with at least one chick surviving until colour-ringing, 6.post.breeding.unsuccessful=post-breeding phase after unsuccessful breeding attempt
 	* sex: M=male, F=female
 	* behaviour: behaviour as classified using the random forest model developed in Lok et al. 2023. In the current analysis, we distinguished foraging (searching, handling or ingesting), resting (sitting or standing), flying (flapping or soaring) or other (walking or drinking). 
 	* lat.nest = latitude of the nest (decimal degrees, WGS84)

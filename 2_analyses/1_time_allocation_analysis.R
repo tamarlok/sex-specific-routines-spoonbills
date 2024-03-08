@@ -49,6 +49,14 @@ gps.breeding.data.behav$behaviour2[gps.breeding.data.behav$distance.to.nest<5] =
 # turn foraging_land into "other"  
 gps.breeding.data.behav$behaviour2[gps.breeding.data.behav$behaviour2=="foraging_land"] <- "other" 
 
+# Include Noordzee-locations as marine habitat when foraging, and Schier/island when resting.  
+gps.breeding.data.behav$behaviour2[gps.breeding.data.behav$habitat=='Noordzee' & gps.breeding.data.behav$behaviour2 =='resting_rest']<-'resting_schier'
+
+# include Eilanden_Rest as 'foraging_brackish' when foraging, and as 'resting_wadden' when resting
+gps.breeding.data.behav$behaviour2[gps.breeding.data.behav$habitat=='Eilanden_Rest' & gps.breeding.data.behav$behaviour =='resting']<-'resting_wadden'
+gps.breeding.data.behav$behaviour2[gps.breeding.data.behav$habitat=='Eilanden_Rest' & gps.breeding.data.behav$behaviour =='foraging']<-'foraging_brackish'
+table(gps.breeding.data.behav$behaviour2, gps.breeding.data.behav$habitat)
+
 # create second breeding phase column in which post-breeding successful and unsuccessful are pooled:
 gps.breeding.data.behav$breeding.phase2 <- as.character(gps.breeding.data.behav$breeding.phase)
 gps.breeding.data.behav$breeding.phase2[gps.breeding.data.behav$breeding.phase.nr==5|gps.breeding.data.behav$breeding.phase.nr==6] <- "5.post-breeding"

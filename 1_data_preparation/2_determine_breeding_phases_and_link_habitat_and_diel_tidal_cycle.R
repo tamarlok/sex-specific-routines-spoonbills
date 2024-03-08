@@ -4,7 +4,7 @@ breeding.data <- breeding.data[breeding.data$used==1,] # only select birdyears w
 
 # link the gps.behav.data to habitat and calculate other variables. 
 # load the habitat shapefile of Schiermonnikoog and surroundings, made by the RUG Geodienst:
-schier_new84_sel <- readOGR(dsn = "data/study_area_shapefile/study_area.shp")
+schier_new84_sel <- readOGR(dsn = "data/study_area_shapefile/study_area_shapefile.shp")
 schier_new84_sel$habitat <- as.character(schier_new84_sel$Habitat)
 schier_new84_sel$habitat[is.na(schier_new84_sel$habitat)] <- "unknown"
 schier_new84_sel$habitat[schier_new84_sel$habitat=="Wadgeulen_Diep"|schier_new84_sel$habitat=="Wadgeulen_Ondiep"|schier_new84_sel$habitat=="Wadplaten"|schier_new84_sel$habitat=="Wad_Kweldergeul_Brak"]="waddenzee" 
@@ -196,9 +196,6 @@ gps.breeding.data.behav = gps.breeding.data.behav[gps.breeding.data.behav$behavi
 # remove cases where habitat was unknown (because outside habitat map):
 gps.breeding.data.behav = gps.breeding.data.behav[gps.breeding.data.behav$habitat!='unknown',]
 
-# Include Noordzee-locations as marine habitat when foraging, and Schier/island when resting.  
-gps.breeding.data.behav$behaviour2[gps.breeding.data.behav$habitat=='Noordzee' & gps.breeding.data.behav$behaviour2 =='resting_rest']<-'resting_schier'
-
 # check where the locations on Eilanden_Rest are:
 gps.breeding.data.rest = gps.breeding.data.behav[gps.breeding.data.behav$habitat=='Eilanden_Rest',]
 gps.breeding.data.rest$behav.nr <- 1
@@ -207,10 +204,6 @@ gps.breeding.data.rest$behav.nr[gps.breeding.data.rest$behaviour=='flying'] <- 3
 coordinates(gps.breeding.data.rest) <- c("longitude","latitude")
 proj4string(gps.breeding.data.rest) <- CRS("+proj=longlat +datum=WGS84")
 mapview(gps.breeding.data.rest, zcol="behaviour", col.regions=c('red','blue','grey','green')) # locations on saltmarsh of Ameland and in gully on Rottumerplaat 
-# include Eilanden_Rest as 'foraging_brackish' when foraging, and as 'resting_wadden' when resting
-gps.breeding.data.behav$behaviour2[gps.breeding.data.behav$habitat=='Eilanden_Rest' & gps.breeding.data.behav$behaviour =='resting']<-'resting_wadden'
-gps.breeding.data.behav$behaviour2[gps.breeding.data.behav$habitat=='Eilanden_Rest' & gps.breeding.data.behav$behaviour =='foraging']<-'foraging_brackish'
-table(gps.breeding.data.behav$behaviour2, gps.breeding.data.behav$habitat)
 
 # subsample data so that one (the first) sample per half hour is retained:
 gps.breeding.data.behav <- gps.breeding.data.behav[order(gps.breeding.data.behav$birdID, gps.breeding.data.behav$date_time_CEST),]
@@ -263,6 +256,6 @@ gps.breeding.data.behav = gps.breeding.data.behav[order(gps.breeding.data.behav$
 # remove NA's: (this was already done, as no rows are removed after running the below line)
 gps.breeding.data.behav <- na.omit(gps.breeding.data.behav[,c('birdID','year','date_time_CEST','longitude','latitude','habitat','breeding.phase','sex','behaviour','lat.nest','lon.nest','distance.to.nest','diel_rad','tidal_stage_rad')])
 
-write.csv(gps.breeding.data.behav, "data/gps.breeding.data.behav.csv")
+write.csv(gps.breeding.data.behav, "data/gps.breeding.data.behav.csv", row.names=F)
 
 keep(gps.breeding.data.behav, bird.data, breeding.data, sure=T)

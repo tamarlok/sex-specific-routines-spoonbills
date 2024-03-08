@@ -1,5 +1,4 @@
-ch = read.csv("data/ch_data_tagged_untagged_adults.csv", colClasses = c('character','character','numeric','factor'))
-ch$tag = as.factor(ifelse(ch$tag_type=='none', 'no','yes'))
+ch = read.csv("data/ch_data_tagged_untagged_adults.csv", colClasses = c('character','character','factor'))
 
 # survival analysis investigating tag effect on survival (explorative analysis showed that survival was best modelled as constant rather than with annual variation or a linear time trend)
 proc = process.data(ch, begin.time= 2012, model = "CJS", groups="tag")
