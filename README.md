@@ -83,7 +83,7 @@ Details for: breeding.data.csv
 	* hatchday2: day of the year that the first chick of the second breeding attempt hatched. In most cases, there was only one breeding attempt and no information is filled in here
 	* used: 0=not used for analysis because of unreliable data, no breeding attempt or no information on breeding attempt because the bird did not breed in the study area; 1=used for analyses.
 
-Details for: BS_data_tagged_untagged.csv
+Details for: bs_data_tagged_untagged.csv
 ----------------------------------------
 * Description: a comma-delimited file containing the breeding success of tagged and untagged birds as monitored by the Werkgroep Lepelaar (data accessed from the spoonbill monitoring database of the Werkgroep Lepelaar). 
 
@@ -163,9 +163,9 @@ Details for: map_NL_greyscale.png
 
 * Size: 469 kB
 
-Details for: RF.models.RData
+Details for: rf.model.RData
 ----------------------------
-* Description: random forest models created with the code from Lok et al. 2023 to classify behaviour on the basis of accelerometer data.
+* Description: random forest model created with the code from Lok et al. 2023 to classify behaviour on the basis of accelerometer data, using a set of summary statistics calculated over segments of 0.4 s.
 
 * Format: .RData
 
@@ -192,8 +192,6 @@ Details for: study_area_shapefile
 		* Schier_Brak_Rest: brackish water other than saltmarsh gullies
 		* Schier_Zoet: freshwater
 		* Schier_Restgroep: other habitats within Schiermonnikoog than the above defined
-	* Totaal_Layer
-		* Habitat_Lepelaar_Totaal
 	* Vasteland: mainland
 		* Wal_Kwelder: saltmarsh
 		* Wal_Kweldergeul_Brak: saltmarsh gullies

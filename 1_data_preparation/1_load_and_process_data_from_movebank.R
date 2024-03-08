@@ -12,6 +12,9 @@ bird.data$end_deployment <- dmy(bird.data$end_deployment, tz='UTC')
 bird.data$year.end <- year(bird.data$end_deployment)
 birds = bird.data$birdID
 
+# load random forest model
+load("data/rf.model.RData")
+
 # set system time zone 
 Sys.setenv(TZ="GMT")
 

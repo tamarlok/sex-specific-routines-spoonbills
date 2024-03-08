@@ -17,7 +17,7 @@ p.modavg = unique(p.modavg[,c('time','estimate','lcl','ucl')])
 write.csv(p.modavg, "output/TableS7 - p estimates.csv")
 
 # Load BS data
-BS_nest_tag = read.csv("data/BS_data_tagged_untagged.csv", header=T)
+BS_nest_tag = read.csv("data/bs_data_tagged_untagged.csv", header=T)
 BS_nest_tag$year = as.factor(BS_nest_tag$year)
 
 # Analyse data on nest level (which means that nests can have either one or two tagged parents)

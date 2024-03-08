@@ -1,5 +1,5 @@
 # Plot shapefile of study area
-schier_new84_sel <- readOGR(dsn = "data/study_area_shapefile/study_area.shp")
+schier_new84_sel <- readOGR(dsn = "data/study_area_shapefile/study_area_shapefile.shp")
 
 ColHabitats = c('grey60','forestgreen','darkolivegreen','lightblue','lightblue','darkblue',
                 'cyan','darkolivegreen2','cyan','forestgreen','lightblue','cyan','blue',
@@ -128,4 +128,5 @@ p <- OpenStreetMap::autoplot.OpenStreetMap(schiermap) +
         axis.title = element_blank()) + 
   scale_fill_gradient(low = "yellow", high = "red", trans="log", labels=c(1,7,55,403), name="density") + 
   facet_grid(breeding.phase2~sex, labeller = labeller(breeding.phase2 = phase.labs, sex = sex.labs))
+p
 ggsave(file=paste("output/FigS4_foraging.maps.pdf",sep=""), plot = p, width=15, height=14, units="cm")

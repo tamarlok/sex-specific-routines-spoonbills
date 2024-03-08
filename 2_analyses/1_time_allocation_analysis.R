@@ -245,6 +245,8 @@ birds_prop_for_marine$prop_for_marine <- birds_prop_for_marine$foraging_marine/b
 ## TIMING OF NEST ATTENDANCE AND FORAGING ANALYSIS ###
 ######################################################
 
+### NOTE: these models take a very long time to converge; the below part is not needed for the subsequent scripts to run properly. 
+
 ### (4) TIMING OF NEST ATTENDANCE
 
 # Compare all 32 possible models (with in all models, the main effectsexxbp (i.e. the interaction between sex and breeding phase) kept in):
