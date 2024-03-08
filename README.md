@@ -26,11 +26,11 @@ Project Structure
 
 ```
 ├── README.md
-├── data				<- Data used in the analyses
-├── master.R			<- Code that calls the different scripts for data preparation, analyses and visualisation
+├── data		<- Data used in the analyses
+├── master.R		<- Code that calls the different scripts for data preparation, analyses and visualisation
 ├── functions.R		<- Code for the functions used in the different scripts
 ├── 1_data_preparation	<- Scripts to import and process data
-├── 2_analyses			<- Scripts to reproduce analyses 
+├── 2_analyses		<- Scripts to reproduce analyses 
 └── 3_visualisation	<- Scripts for visualisation of results
 ```
   
