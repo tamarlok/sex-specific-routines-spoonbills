@@ -2,10 +2,9 @@ Reference Information
 =====================
 
 * Authors: 			Tamar Lok, M. van der Geest, P. de Goeij, E. Rakhimberdiev, T. Piersma
-* Paper:			Sex-specific nest attendance rhythm and foraging habitat use in a colony-breeding waterbird
+* Datapackage Title: 		Data for the article "Sex-specific nest attendance rhythm and foraging habitat use in a colony-breeding waterbird"
 * Institutes:			NIOZ Royal Netherlands Institute for Sea Research and University of Groningen
 * Study area:			Schiermonnikoog (53°29’N, 6°15’E) and surrounding foraging grounds
-* Dataset Title: 		Data for the article "Sex-specific nest attendance rhythm and foraging habitat use in a colony-breeding waterbird"
 * Persistent Identifier:	https://doi.org/xxxx/zenodo.xxxx
 * Date of Issue:		2024-03-08
 
@@ -125,7 +124,13 @@ Details for: gps.breeding.data.behav.csv
 	* date_time_CEST: date and time in CEST (Europe/Amsterdam summertime)	
 	* longitude: longitude (decimal degrees, WGS84)
 	* latitude: latitude (decimal degrees, WGS84)
-	* habitat: habitat as described for the datafolder 'shapefile_study_area'
+	* habitat: habitat type based on the study_area_shapefile habitats as described under the datafolder 'shapefile_study_area'. In this file, the following habitat types are distinguished: 
+		* waddenzee=Wadgeulen_Diep+Wadgeulen_Ondiep+Wadplaten+Wad_Kweldergeul_Brak : Wadden Sea
+		* Schier_brak=Schier_Kweldergeul_Brak+Schier_Brak_Rest : brackish water on Schiermonnikoog
+		* wal_rest_zoet=Wal_Zoet_Ondiep+Wal_Zoet_Diep : freshwater on mainland except Lauwersmeer
+		* wal_rest_land=Wal_Kwelder+Wal_Land_Rest : land on mainland expect Lauwersmeer
+		* LM_land=LG_Land_Rest+LG_Moeras : land within Lauwersmeer
+		* LM_zoet=LG_Zoet_Ondiep_LG_Zoet_Diep : freshwater within Lauwersmeer
 	* breeding.phase: 3.eggs=incubating eggs, 4.chicks=rearing chicks, 5.post.breeding.successful=post-breeding phase with at least one chick surviving until colour-ringing, 6.post.breeding.unsuccessful=post-breeding phase after unsuccessful breeding attempt
 	* sex: M=male, F=female
 	* behaviour: behaviour as classified using the random forest model developed in Lok et al. 2023. In the current analysis, we distinguished foraging (searching, handling or ingesting), resting (sitting or standing), flying (flapping or soaring) or other (walking or drinking). 
@@ -135,7 +140,7 @@ Details for: gps.breeding.data.behav.csv
 	* diel_rad = time of the day, standardized to radians (0=2π=midnight, π=noon)  
 	* tidal_stage_rad = phase within the tidal cycle, standardized to radians (0=2π=high tide, π=low tide)
 	
-Details for: tide_data_Schiermonnikoog_2010_2019.txt
+Details for: tide_data_schiermonnikoog_2010-2019.txt
 ---------------------------------------- 
 * Description: a comma-delimited file containing the dates and times of low and high tide at Schiermonnikoog () in the years 2010-2019.
 
@@ -164,6 +169,53 @@ Details for: RF.models.RData
 * Format: .RData
 
 * Size: 24,137 kB
+
+Details for: study_area_shapefile
+---------------------------------
+* Description: files associated with the habitat map of the study area. Habitat types within the study area have been assigned on the basis of the BRT TOP10NL topographic map from 2011 (resolution 1:20.000; https://www.kadaster.nl/zakelijk/producten/geo-informatie/topnl) using expert knowledge and by changing lines into polygons for small waterbodies (e.g., ditches, small gullies).
+
+* Formats: .dbf, .prj, .shp, .shx
+
+* Sizes: 14,840 kB, 1 kB, 41,724 kB, 695 kB
+
+* Habitats distinguished within seperately distinguished geographical areas:
+	* Lauwersmeer
+		* LG_Land_Rest: land 
+		* LG_Moeras: marshes
+		* LG_Zoet_Diep: deep freshwater
+		* LG_Zoet_Ondiep: shallow freshwater
+	* Schiermonnikoog
+		* Schier_Kwelder: saltmarsh
+		* Schier_Land_Rest: land other than saltmarsh
+		* Schier_Kweldergeul_Brak: saltmarsh gullies
+		* Schier_Brak_Rest: brackish water other than saltmarsh gullies
+		* Schier_Zoet: freshwater
+		* Schier_Restgroep: other habitats within Schiermonnikoog than the above defined
+	* Totaal_Layer
+		* Habitat_Lepelaar_Totaal
+	* Vasteland: mainland
+		* Wal_Kwelder: saltmarsh
+		* Wal_Kweldergeul_Brak: saltmarsh gullies
+		* Wal_Land_Rest: land other than saltmarsh		
+		* Wal_Moeras: marsh
+		* Wal_Zoet_Diep: deep freshwater 
+		* Wal_Zoet_Ondiep: shallow freshwater
+	* Zee: sea
+		* Eilanden_Rest: other islands
+		* Noordzee: North Sea
+		* Wadgeulen_Diep: deep gullies in the Wadden Sea
+		* Wadgeulen_Ondiep: shallow gullies in the Wadden Sea
+		* Wadplaten: intertidal flats (exposed around low tide only)
+
+- - -
+
+References
+==========
+
+Lok T, van der Geest M, Bom RA, de Goeij P, Piersma T, Bouten W, 2023. Prey ingestion rates revealed by back-mounted accelerometers in Eurasian spoonbills. Animal Biotelemetry 11:5.
+
+
+	
 
 
 
