@@ -40,7 +40,7 @@ Project Structure
 Data files
 ==========
 The raw tracking data generated and analyzed in this study are stored at Movebank (www.movebank.org) in the study “SPOONBILL_METAWAD - Eurasian Spoonbills (Platalea leucorodia, Threskiornithidae) breeding on Schiermonnikoog, The Netherlands” (Movebank study ID 2596955604) and will be made available upon reasonable request.
-Other datafiles as well as the processed tracking data required to run the scripts in the folders '2_analyses' and 3_visualisation are available in the folder 'data'. 
+Other datafiles as well as the processed tracking data required to run the scripts in the folders '2_analyses' and '3_visualisation' are available in the folder 'data'. 
 
 Details for: bird.data.csv
 --------------------------
@@ -57,7 +57,7 @@ Details for: bird.data.csv
 	* colourcode: unique combination of coloured and/or inscription rings attached to the tibia of the bird
 	* sex: M=male, F=female
 	* start_deployment: date and time that the bird received its tracking device
-	* end_deployment: date and time that the tracking device was removed from the bird. When 13/12/2099 is written, the device was never removed.
+	* end_deployment: date and time that the tracking device was removed from the bird. When 31/12/2099 is written, the device was never removed.
 	* date_death: date that the bird died (assessed from change in accelerometer data signal)
 	* bodymass: mass (g) measured during deployment
 	* headbill: combined length (mm) of head and bill
