@@ -1,7 +1,4 @@
-Schiermonnikoog
-Opgetreden hoog- en laagwaters
-Resp. datum dd-mm-jjjj, tijd uu:mm in MET (wintertijd), soort (1=HW,2=LW)
-en stand in cm + NAP
+date time lowhigh waterheight
 01-01-2010 04:28   2    -153    
 01-01-2010 10:44   1      95    
 01-01-2010 16:24   2    -137    

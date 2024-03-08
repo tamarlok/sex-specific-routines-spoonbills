@@ -5,7 +5,7 @@ loginStored <- movebankLogin(username="xxxx", password="xxxx")
 spoonbill_metawad_ID <- getMovebankID("SPOONBILL_METAWAD - Eurasian Spoonbills (Platalea leucorodia, Threskiornithidae) breeding on Schiermonnikoog, The Netherlands", login=loginStored)
 
 # import bird data to import Movebank data separately per individual (most of these data are also in Movebank, except for several of the biometric measurements)
-bird.data <- read.csv("data/raw/bird.data.csv") # file available on Dryad
+bird.data <- read.csv("data/bird.data.csv")
 bird.data$start_deployment <- dmy(bird.data$start_deployment, tz='UTC')
 bird.data$year.start <- year(bird.data$start_deployment)
 bird.data$end_deployment <- dmy(bird.data$end_deployment, tz='UTC')

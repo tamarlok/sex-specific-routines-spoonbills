@@ -1,3 +1,17 @@
+# reload bird.data, breeding.data and gps.breeding.data.behav (to be able to start running the script from this point onward)
+bird.data <- read.csv("data/bird.data.csv")
+bird.data$start_deployment <- dmy(bird.data$start_deployment, tz='UTC')
+bird.data$year.start <- year(bird.data$start_deployment)
+bird.data$end_deployment <- dmy(bird.data$end_deployment, tz='UTC')
+bird.data$year.end <- year(bird.data$end_deployment)
+birds = bird.data$birdID
+
+breeding.data <- read.csv("data/breeding.data.csv")
+breeding.data <- breeding.data[breeding.data$used==1,] # only select birdyears with suitable and reliable data
+
+gps.breeding.data.behav <- read.csv("data/gps.breeding.data.behav.csv")
+# end of reloading
+
 gps.breeding.data.behav$sex <- as.factor(gps.breeding.data.behav$sex)
 gps.breeding.data.behav$birdID <- as.factor(gps.breeding.data.behav$birdID)
 gps.breeding.data.behav$year <- as.factor(gps.breeding.data.behav$year)
@@ -57,15 +71,11 @@ gps.breeding.data.behav.phase34 <- gps.breeding.data.behav[gps.breeding.data.beh
 glmer.nestprob <- glmer(at_nest~breeding.phase*sex+(1|year)+(1|birdID), gps.breeding.data.behav.phase34, family='binomial', na.action='na.fail', nAGQ=0) # nACQ=0 makes convergence about 4 times faster. 
 
 # Check model assumptions for glmer models
-# https://stats.stackexchange.com/questions/524376/testing-glmer-model-assumptions-optionally-in-r
-# using package DHARMa:
-# https://cran.r-project.org/web/packages/DHARMa/vignettes/DHARMa.html#installing-loading-and-citing-the-package
-# (1) check for over- or underdispersion of the data:
+# check for over- or underdispersion of the data:
 simOutput.glmer.nestprob <- simulateResiduals(glmer.nestprob, plot=F)
 residuals(simOutput.glmer.nestprob)
 windows()
 plot(simOutput.glmer.nestprob)
-# plots can also be called separately:
 plotQQunif(simOutput.glmer.nestprob)
 plotResiduals(simOutput.glmer.nestprob)
 
@@ -162,7 +172,7 @@ marforprob.phasecomp.F.sign = rbind(marforprob.phasecomp.F$sign[1:4],
                                  c("","","",marforprob.phasecomp.F$sign[10]))
 marforprob.phasecomp.F.z.ratio.sign = matrix(paste(marforprob.phasecomp.F.z.ratio, marforprob.phasecomp.F.sign, sep=""), ncol=4)
 write.table(marforprob.phasecomp.F.z.ratio.sign, 'clipboard', sep='\t')
-# females: (pre=post+=post-)<(eggs=chicks)
+
 # extract female comparisons and make table out of it:
 marforprob.phasecomp.M = marforprob.phasecomp[marforprob.phasecomp$sex=="M",]
 marforprob.phasecomp.M.z.ratio = rbind(marforprob.phasecomp.M$z.ratio[1:4],
@@ -186,9 +196,6 @@ marforprob.sexcomp$sign = ifelse(marforprob.sexcomp$p.value<0.001, "***",
 write.table(paste(round(marforprob.sexcomp$z.ratio, 2), marforprob.sexcomp$sign, sep=""), 'clipboard', sep='\t')
 
 # HABITAT USE IN RELATION TO WITHIN-SEX BILL AND TARSUS LENGTH
-# PREPARATION FOR FIGURE 5: discussion figure about explanation for large variation in male marine foraging
-# does the probability to forage in marine habitat depend on bill, tarsus or body mass?
-bird.data <- read.csv("data/raw/bird.data.csv", header=T) # reload bird data is biometry has now been added
 bird.data$bill <- bird.data$headbill - bird.data$head
 prop.for.marine.biometrics = merge(gps.breeding.data.behav.marfor, bird.data[c(-12,-20),c('birdID','bodymass','bill','tarsus')], all.x=T)
 prop.for.marine.biometrics.females <- prop.for.marine.biometrics[prop.for.marine.biometrics$sex=='F',]
@@ -222,7 +229,7 @@ unique(prop.for.marine.tarsus.males$birdID)
 # for Figure 7, calculate the mean proportion of marine foraging per bird:
 birds_prop_for_marine <- aggregate(cbind(foraging,foraging_marine)~birdID+sex+bill+breeding.phase, prop.for.marine.biometrics[is.na(prop.for.marine.biometrics$bill)==F,], sum)
 birds_prop_for_marine$prop_for_marine <- birds_prop_for_marine$foraging_marine/birds_prop_for_marine$foraging
-birds_prop_for_marine[order(birds_prop_for_marine$birdID, birds_prop_for_marine$breeding.phase),] # 6068 foraged a lot in the freshwater Lauwersmeer during postbreeding, thereby changing the graph a little bit.
+birds_prop_for_marine[order(birds_prop_for_marine$birdID, birds_prop_for_marine$breeding.phase),] 
 birds_prop_for_marine <- aggregate(cbind(foraging,foraging_marine)~birdID+sex+bill, prop.for.marine.biometrics[is.na(prop.for.marine.biometrics$bill)==F,], sum)
 birds_prop_for_marine$prop_for_marine <- birds_prop_for_marine$foraging_marine/birds_prop_for_marine$foraging
 
@@ -287,13 +294,6 @@ model.names <- ls()[grep("bam.nest",ls())]
 bam.nest.model.list <- mget(model.names)
 
 # retrieve deviance and AIC for each model
-AIC_deviance <- function(x) {
-  K = sum(x$edf)
-  aic_value = x$aic
-  aic_value_alt = AIC(x)
-  AICc_value = AICc(x)
-  round(c(K=K, AIC1=aic_value, AIC2=aic_value_alt, AICc=AICc_value),2)
-}
 K_aic_values <- t(sapply(bam.nest.model.list,AIC_deviance))
 model_aic_df_nesting <- as.data.frame(model_aic_df_nesting)
 model_aic_df_nesting <- model_aic_df_nesting[order(model_aic_df_nesting$AICc),] # the full model is the best. 

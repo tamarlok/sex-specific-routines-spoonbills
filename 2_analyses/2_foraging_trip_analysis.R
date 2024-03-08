@@ -4,7 +4,7 @@ gps.breeding.data.behav$at_colony_50m[gps.breeding.data.behav$distance.to.nest<5
 gps.breeding.data.behav$foraging_trip = 0
 
 ### Determine and label individual foraging trips
-### Important that the data is ordered correctly, on year, bird, date
+### Important that the data are ordered correctly, on year, bird, date
 gps.breeding.data.behav <- gps.breeding.data.behav[order(gps.breeding.data.behav$year, gps.breeding.data.behav$birdID, gps.breeding.data.behav$date_time_CEST),]
 
 for(bird in unique(gps.breeding.data.behav$birdID)) {
@@ -53,10 +53,7 @@ names(end_time_of_trips)[4] = 'end_time'
 trips.start.end <- cbind(start_time_of_trips, end_time=end_time_of_trips$end_time)
 trips.start.end$yday_start <- yday(trips.start.end$start_time)
 trips.start.end$yday_end <- yday(trips.start.end$end_time)
-trips.start.end$trip.duration <- round(difftime(trips.start.end$end_time, trips.start.end$start_time, units="hour"),2)+0.5 # we add 30 minutes (=0.5 h), see above
-# check that aggregate functions were done in the same order:
-table(trips.start.end$birdID==foraging.sums.per.trip$birdID)
-table(trips.start.end$birdID==max.distance.year.bird.trip$birdID)
+trips.start.end$trip.duration <- round(difftime(trips.start.end$end_time, trips.start.end$start_time, units="hour"),2)+0.5 # we add 30 minutes (=0.5h), see above
 trip.info <- cbind(trips.start.end, foraging.sums.per.trip[,c('freq','foraging')], distance.to.nest=max.distance.year.bird.trip$distance.to.nest)
 
 ## only use trips where the bird was actually foraging for some time:

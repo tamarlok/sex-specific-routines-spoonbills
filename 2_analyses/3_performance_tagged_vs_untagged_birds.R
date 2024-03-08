@@ -1,4 +1,4 @@
-ch = read.csv("data/raw/ch_data_tagged_untagged_adults.csv", colClasses = c('character','character','numeric','factor'))
+ch = read.csv("data/ch_data_tagged_untagged_adults.csv", colClasses = c('character','character','numeric','factor'))
 ch$tag = as.factor(ifelse(ch$tag_type=='none', 'no','yes'))
 
 # survival analysis investigating tag effect on survival (explorative analysis showed that survival was best modelled as constant rather than with annual variation or a linear time trend)
@@ -18,7 +18,7 @@ p.modavg = unique(p.modavg[,c('time','estimate','lcl','ucl')])
 write.csv(p.modavg, "output/TableS7 - p estimates.csv")
 
 # Load BS data
-BS_nest_tag = read.csv("data/raw/BS_data_tagged_untagged.csv", header=T)
+BS_nest_tag = read.csv("data/BS_data_tagged_untagged.csv", header=T)
 BS_nest_tag$year = as.factor(BS_nest_tag$year)
 
 # Analyse data on nest level (which means that nests can have either one or two tagged parents)

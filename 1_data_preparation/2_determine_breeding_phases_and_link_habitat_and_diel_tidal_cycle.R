@@ -1,10 +1,10 @@
 ### link the gps data to habitat and breeding data, and determine nest and breeding phases ###
-breeding.data <- read.csv("data/raw/breeding.data.csv") # file deposited on Dryad
+breeding.data <- read.csv("data/breeding.data.csv")
 breeding.data <- breeding.data[breeding.data$used==1,] # only select birdyears with suitable and reliable data
 
-# link the gps.acc.data to habitat and calculate other variables. 
+# link the gps.behav.data to habitat and calculate other variables. 
 # load the habitat shapefile of Schiermonnikoog and surroundings, made by the RUG Geodienst:
-schier_new84_sel <- readOGR(dsn = "data/raw/study_area_shapefile/study_area.shp") # files deposited on Dryad
+schier_new84_sel <- readOGR(dsn = "data/study_area_shapefile/study_area.shp")
 schier_new84_sel$habitat <- as.character(schier_new84_sel$Habitat)
 schier_new84_sel$habitat[is.na(schier_new84_sel$habitat)] <- "unknown"
 schier_new84_sel$habitat[schier_new84_sel$habitat=="Wadgeulen_Diep"|schier_new84_sel$habitat=="Wadgeulen_Ondiep"|schier_new84_sel$habitat=="Wadplaten"|schier_new84_sel$habitat=="Wad_Kweldergeul_Brak"]="waddenzee" 
@@ -15,12 +15,12 @@ schier_new84_sel$habitat[schier_new84_sel$habitat=="LG_Land_Rest"|schier_new84_s
 schier_new84_sel$habitat[schier_new84_sel$habitat=="LG_Zoet_Ondiep"|schier_new84_sel$habitat=="LG_Zoet_Diep"]="LM_zoet"
 
 # determine nest location and breeding phases (distinguishing successful and unsuccessful post-breeding phases):
-Sys.setenv(TZ='Europe/Amsterdam') # make sure that time zone is set to local time
+Sys.setenv(TZ='Europe/Amsterdam') # set time zone to local time
 
 gps.breeding.data.behav.list <- list()
 
 for (i in 1:length(gps.behav.data.list)) {
-  df <- na.omit(gps.behav.data.list[[i]]) # remove missing values
+  df <- na.omit(gps.behav.data.list[[i]])
   df$date_time_CEST <- with_tz(df$date_time, tzone="Europe/Amsterdam") 
   birdID <- df$birdID[1]
   df <- merge(df, unique(bird.data[,c("birdID","sex")])) # the unique() is needed as 656 exists 3 times in the bird.data
@@ -31,11 +31,10 @@ for (i in 1:length(gps.behav.data.list)) {
   df$freq <- 1
   coordinates(df)  <- ~longitude + latitude  # to make it a spatialpoints dataframe
   proj4string(df) <- CRS(proj4string(schier_new84_sel))  # to give the same projection to df as the habitat file schier_new84_sel has
-  # add habitat
-  habitats.to.add <- over(df, schier_new84_sel) 
+  habitats.to.add <- over(df, schier_new84_sel) # add habitat 
   df <- data.frame(df, habitats.to.add[,c('habitat')]) # this function does not yet remove GPS points outside the habitat map, but gives NA's for the habitat columns in those cases  
-  df$habitat[is.na(df$habitat)] <- "unknown" # replace habitat of locations outside habitat with "unknown"
-  # calculate duration of GPS-fixes, but before doing so, first order the df according to date_time (if this was not already done)
+  df$habitat[is.na(df$habitat)] <- "unknown" # replace habitat of locations outside the study area map with "unknown"
+  # calculate duration of GPS-fixes, but before doing so, first order the df according to date_time
   df <- as.data.frame(df)
   df <- df[order(df$date_time_CEST),]
   df$time_to_previous <- c(NA, interval(df$date_time_CEST[1:(dim(df)[1]-1)], df$date_time_CEST[2:dim(df)[1]])%/%seconds(1))
@@ -63,6 +62,7 @@ for (i in 1:length(gps.behav.data.list)) {
 
 # change from list to df:
 gps.breeding.data.behav<-from.list.to.df(gps.breeding.data.behav.list)
+gps.breeding.data.behav = gps.breeding.data.behav[order(gps.breeding.data.behav$year, gps.breeding.data.behav$birdID, gps.breeding.data.behav$yday_CEST),]
 
 # additional calculations on gps.breeding.data.behav
 # replace NA values in the breeding.phase column with the value in the breeding column
@@ -77,13 +77,6 @@ gps.breeding.data.behav$breeding.phase.nr[gps.breeding.data.behav$breeding.phase
 gps.breeding.data.behav$breeding.phase.nr[gps.breeding.data.behav$breeding.phase=='post.breeding.unsuccessful'] = 6
 gps.breeding.data.behav$breeding.phase = paste(gps.breeding.data.behav$breeding.phase.nr, gps.breeding.data.behav$breeding.phase, sep='.')
 
-gps.breeding.data.behav = gps.breeding.data.behav[order(gps.breeding.data.behav$year, gps.breeding.data.behav$birdID, gps.breeding.data.behav$yday_CEST),]
-ydays.year.bird.phase.all = unique(gps.breeding.data.behav[,c('year','birdID','sex','breeding.phase','breeding.phase.nr','attempt','yday_CEST','week')])
-dim(ydays.year.bird.phase.all) 
-
-yday.min.year.bird.phase = aggregate(yday_CEST~year+attempt+birdID+sex+breeding.phase+breeding.phase.nr, data=ydays.year.bird.phase.all, min)
-yday.min.year.bird.phase = yday.min.year.bird.phase[order(yday.min.year.bird.phase$year, yday.min.year.bird.phase$birdID, yday.min.year.bird.phase$attempt, yday.min.year.bird.phase$breeding.phase.nr),]
-
 # change NA into unknown behaviour:
 gps.breeding.data.behav$behaviour[is.na(gps.breeding.data.behav$behaviour)] <- "unknown"
 gps.breeding.data.behav$speed_2d = round(gps.breeding.data.behav$speed_2d,2)
@@ -93,9 +86,9 @@ duration_yday_birdID_year_all <- aggregate(duration/60~year+birdID+sex+yday_CEST
 dim(duration_yday_birdID_year_all) # 5663 birddays
 names(duration_yday_birdID_year_all)[8] = 'dur_per_yday'
 distr.duration <- table(round(duration_yday_birdID_year_all$dur_per_yday,0), duration_yday_birdID_year_all$birdID)
-distr.duration # when linked with behaviour estimated from acc-data, total duration per day is often less than 23.8 hours, as regularly, an acc-sample is not measured. 
+distr.duration 
 
-# the nest attempt determination went wrong for 6289 in 2017, as the second breeding attempt was not monitored and therefore, hatching date was unknown. Therefore, the 'pre-breeding phase' of the second breeding attempt is too long, as the bird is actually breeding again during part of this period. And the post-fledging phase is therefore defined as the 3rd attempt. Remove this pre-breeding phase from the analysis:
+# the nest attempt determination went wrong for 6289 in 2017, as the second breeding attempt was not monitored and therefore, hatchdate was unknown. Therefore, the 'pre-breeding phase' of the second breeding attempt is too long, as the bird is actually breeding again during part of this period. And the post-fledging phase is therefore defined as the 3rd attempt. Remove this pre-breeding phase from the analysis:
 gps.breeding.data.behav$breeding.phase[gps.breeding.data.behav$birdID==6289 & gps.breeding.data.behav$year==2017 & gps.breeding.data.behav$attempt==2 & gps.breeding.data.behav$breeding.phase=='1.pre-breeding'] = NA
 # and make the 3rd attempt the 2nd:
 gps.breeding.data.behav$attempt[gps.breeding.data.behav$birdID==6289 & gps.breeding.data.behav$year==2017 & gps.breeding.data.behav$attempt==3] = 2
@@ -108,7 +101,7 @@ nest.locations.bird.year[nest.locations.bird.year$nest1>nest.locations.bird.year
 # when nest2>nest1 and nest2 was a real nesting attempt: 
 nest.locations.bird.year[nest.locations.bird.year$nest2>nest.locations.bird.year$nest1 & nest.locations.bird.year$nest2.real==1,c('lat.nest','lon.nest')] <- nest.locations.bird.year[nest.locations.bird.year$nest2>nest.locations.bird.year$nest1 & nest.locations.bird.year$nest2.real==1,c('lat.nest2','lon.nest2')]
 
-# during the time allocation analysis, it turned out that the nest (attempt) assignment went wrong for 6288 and 6289 in 2017. The reason for 6288 was that the transmitter failed shortly after the real breeding attempt, therefore producing more locations at an earlier unsuccessful settlement. The reason for 6289 was that she had two breeding attempts with similar amounts of data, and with unknown hatchdate for the 2nd breeding attempt. Moreover, as 656 had two trackers in 2015, during the same breeding attempt, only one row (of the two) for 656 in 2015 should be selected. 
+# during the time allocation analysis, it turned out that the nest (attempt) assignment went wrong for 6288 and 6289 in 2017. The reason for 6288 was that the transmitter failed shortly after the real breeding attempt, therefore producing more locations at an earlier unsuccessful settlement. The reason for 6289 was that she had two breeding attempts with similar amounts of data, and with unknown hatchdate for the 2nd breeding attempt. 
 nest.locations.bird.year[nest.locations.bird.year$year==2017 & nest.locations.bird.year$birdID==6288,c('lat.nest','lon.nest')] <- nest.locations.bird.year[nest.locations.bird.year$year==2017 & nest.locations.bird.year$birdID==6288,c('lat.nest2','lon.nest2')] 
 nest.locations.bird.year[nest.locations.bird.year$year==2017 & nest.locations.bird.year$birdID==6289,c('lat.nest','lon.nest')] <- nest.locations.bird.year[nest.locations.bird.year$year==2017 & nest.locations.bird.year$birdID==6289,c('lat.nest1','lon.nest1')] 
 
@@ -116,15 +109,13 @@ nest.locations.bird.year[nest.locations.bird.year$year==2017 & nest.locations.bi
 gps.breeding.data.behav <- merge(gps.breeding.data.behav, nest.locations.bird.year[,c('birdID','year','attempt','lat.nest','lon.nest')])
 
 gps.breeding.data.behav = gps.breeding.data.behav[order(gps.breeding.data.behav$year, gps.breeding.data.behav$birdID, gps.breeding.data.behav$attempt, gps.breeding.data.behav$breeding.phase.nr),]
-unique(gps.breeding.data.behav[,c('year','birdID','attempt','breeding.phase','lat.nest','lon.nest')])
 
 # calculate distance to nest:
 gps.breeding.data.behav$distance.to.nest <- NA
-gps.breeding.data.behav$distance.to.nest[is.na(gps.breeding.data.behav$lat.nest)==F] <- round(distCosine(gps.breeding.data.behav[is.na(gps.breeding.data.behav$lat.nest)==F,c('longitude','latitude')], gps.breeding.data.behav[is.na(gps.breeding.data.behav$lat.nest)==F,c('lon.nest','lat.nest')], r=6378137),3) # gives the distance in meters between nest location and actual position of the bird; can only be calculated when lat.nest (and lon.nest) is known.
+gps.breeding.data.behav$distance.to.nest[is.na(gps.breeding.data.behav$lat.nest)==F] <- round(distCosine(gps.breeding.data.behav[is.na(gps.breeding.data.behav$lat.nest)==F,c('longitude','latitude')], gps.breeding.data.behav[is.na(gps.breeding.data.behav$lat.nest)==F,c('lon.nest','lat.nest')], r=6378137),3) # gives the distance in meters between nest location and actual position of the bird
 
 # link to tide data:
-tide.data <- read.table("data/raw/getij_schiermonnikoog_2010-2019.txt", skip=4)
-names(tide.data) <- c("date","time","lowhigh", "waterheight")
+tide.data <- read.table("data/tide_data_schiermonnikoog_2010-2019.txt", header=T)
 tide.data$date_time <- dmy_hm(paste(tide.data$date, tide.data$time, sep=" "))
 tide.data$date_time_wintertime <- force_tz(tide.data$date_time, tzone="Etc/GMT-1")
 tide.data$date_time_UTC <- with_tz(tide.data$date_time_wintertime, tzone="UTC")
@@ -221,15 +212,7 @@ gps.breeding.data.behav$behaviour2[gps.breeding.data.behav$habitat=='Eilanden_Re
 gps.breeding.data.behav$behaviour2[gps.breeding.data.behav$habitat=='Eilanden_Rest' & gps.breeding.data.behav$behaviour =='foraging']<-'foraging_brackish'
 table(gps.breeding.data.behav$behaviour2, gps.breeding.data.behav$habitat)
 
-# check the sampling frequency per bird per year per yday
-data.overview = table(gps.breeding.data.behav$yday_CEST, gps.breeding.data.behav$birdID, gps.breeding.data.behav$year)
-data.overview = as.data.frame(data.overview)
-names(data.overview) = c('yday','birdID','year','freq')
-data.overview = data.overview[data.overview$freq>0,]
-write.csv(data.overview, 'data/processed/data.overview.csv')
-
-# subsample data so that one sample per half hour is retained:
-# to make sure that the first sample per half hour is retained, first order data by date_time
+# subsample data so that one (the first) sample per half hour is retained:
 gps.breeding.data.behav <- gps.breeding.data.behav[order(gps.breeding.data.behav$birdID, gps.breeding.data.behav$date_time_CEST),]
 gps.breeding.data.behav <- gps.breeding.data.behav %>%
   mutate(time_interval = floor_date(date_time_CEST, unit = "30 mins"))
@@ -238,7 +221,7 @@ gps.breeding.data.behav.30min <- gps.breeding.data.behav %>%
   group_by(time_interval, year, birdID, yday_CEST) %>%
   slice(1)
 
-# how often are different behaviours assigned:
+# how often are different behaviours assigned?
 sample.sizes.behaviours = table(gps.breeding.data.behav.30min$behaviour)
 sample.sizes.behaviours['other']/sum(sample.sizes.behaviours) # 5.0% was estimated as 'other' behaviour.
 
@@ -280,6 +263,6 @@ gps.breeding.data.behav = gps.breeding.data.behav[order(gps.breeding.data.behav$
 # remove NA's: (this was already done, as no rows are removed after running the below line)
 gps.breeding.data.behav <- na.omit(gps.breeding.data.behav[,c('birdID','year','date_time_CEST','longitude','latitude','habitat','breeding.phase','sex','behaviour','lat.nest','lon.nest','distance.to.nest','diel_rad','tidal_stage_rad')])
 
-write.csv(gps.breeding.data.behav, "data/processed/gps.breeding.data.behav.csv") # file deposited on Dryad
+write.csv(gps.breeding.data.behav, "data/gps.breeding.data.behav.csv")
 
 keep(gps.breeding.data.behav, bird.data, breeding.data, sure=T)

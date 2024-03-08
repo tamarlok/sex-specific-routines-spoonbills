@@ -235,10 +235,18 @@ plot.sign.prop.for <- function(ymin, ymax, yrel=0.9, signs = c("***", "***", "**
   plot.sign.arrow(5, 5.3, ymin=ymin, ymax=ymax, yrel=yrel, sign=signs[5], dist.text=dist.text, fontsize=fontsize)
 }
 
-
 plot.sign.for.trips <- function(ymin=0, ymax, yrel=0.9, signs = c("***", "***", "***", "***"), fontsize=1.5) {
   plot.sign.arrow(1, 1.3, ymin=ymin, ymax=ymax, yrel=0.9, sign=signs[1])
   plot.sign.arrow(2, 2.3, ymin=ymin, ymax=ymax, yrel=0.9, sign=signs[2])
   plot.sign.arrow(1, 2, ymin=ymin, ymax=ymax, yrel=0.93, sign=signs[3], col="lightcoral")
   plot.sign.arrow(1.3, 2.3, ymin=ymin, ymax=ymax, yrel=0.96, sign=signs[4], col="lightskyblue")
+}
+
+# retrieve AIC and deviance from a bam model 
+AIC_deviance <- function(x) {
+  K = sum(x$edf)
+  aic_value = x$aic
+  aic_value_alt = AIC(x)
+  AICc_value = AICc(x)
+  round(c(K=K, AIC1=aic_value, AIC2=aic_value_alt, AICc=AICc_value),2)
 }

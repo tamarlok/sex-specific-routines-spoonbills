@@ -1,5 +1,5 @@
 # Plot shapefile of study area
-schier_new84_sel <- readOGR(dsn = "data/raw/study_area_shapefile/study_area.shp")
+schier_new84_sel <- readOGR(dsn = "data/study_area_shapefile/study_area.shp")
 
 ColHabitats = c('grey60','forestgreen','darkolivegreen','lightblue','lightblue','darkblue',
                 'cyan','darkolivegreen2','cyan','forestgreen','lightblue','cyan','blue',
@@ -14,7 +14,7 @@ mapped_habitats <- mapped_habitats[c(2,3,1,7,9,5,8,6,4),] # arranged in the orde
 # manually create legend for Figure 1:
 habitat_types <- data.frame(HabitatsMapped=c("North Sea","tidal gullies (marine)","tidal flats (marine)", "brackish water", "freshwater", "land", "saltmarsh", "marsh", "other islands"),
                             ColHabitats=c("darkblue","blue","lightgoldenrod3","cyan","lightblue","forestgreen","darkolivegreen2","darkolivegreen","grey60"))
-map_NL <- readPNG("data/raw/Map_NL_greyscale.png")
+map_NL <- readPNG("data/map_NL_greyscale.png")
 
 # nest locations of birds used in the analysis are in gps.breeding.data.behav:
 nest.locations.used <- na.omit(unique(gps.breeding.data.behav[,c('birdID','year','lat.nest','lon.nest')]))
