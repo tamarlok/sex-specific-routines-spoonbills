@@ -143,7 +143,7 @@ Details for: gps.breeding.data.behav.csv
 	
 Details for: tide_data_schiermonnikoog_2010-2019.txt
 ---------------------------------------- 
-* Description: a comma-delimited file containing the dates and times of low and high tide at Schiermonnikoog () in the years 2010-2019.
+* Description: a comma-delimited file containing the dates and times of low and high tide at Schiermonnikoog in the years 2010-2019. 
 
 * Format: .txt
 
