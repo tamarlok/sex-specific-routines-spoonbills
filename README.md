@@ -6,7 +6,7 @@ Reference Information
 * Institutes:			NIOZ Royal Netherlands Institute for Sea Research and University of Groningen
 * Study area:			Schiermonnikoog (53°29’N, 6°15’E) and surrounding foraging grounds, The Netherlands
 * Study period:			May 2012 - September 2019
-* Persistent Identifier:	https://doi.org/xxxx/zenodo.xxxx
+* Persistent Identifier:	https://doi.org/10.5281/zenodo.10803827
 * Date of Issue:		2024-03-08
 
 This readme.md file briefly describes the contents of the datapackage required to process, 
