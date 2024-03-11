@@ -1,3 +1,5 @@
+Sys.setenv(TZ='Europe/Amsterdam') # set time zone to local time
+
 # reload bird.data, breeding.data and gps.breeding.data.behav (to be able to start running the script from this point onward)
 bird.data <- read.csv("data/bird.data.csv")
 bird.data$start_deployment <- dmy(bird.data$start_deployment, tz='UTC')
@@ -10,6 +12,7 @@ breeding.data <- read.csv("data/breeding.data.csv")
 breeding.data <- breeding.data[breeding.data$used==1,] # only select birdyears with suitable and reliable data
 
 gps.breeding.data.behav <- read.csv("data/gps.breeding.data.behav.csv")
+gps.breeding.data.behav$date_time_CEST <- ymd_hms(gps.breeding.data.behav$date_time_CEST, tz="Europe/Amsterdam")
 # end of reloading
 
 gps.breeding.data.behav$sex <- as.factor(gps.breeding.data.behav$sex)

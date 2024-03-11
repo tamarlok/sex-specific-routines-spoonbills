@@ -61,7 +61,6 @@ trip.info.sel <- trip.info[trip.info$foraging>0,] # 3160 trips left from 4295
 ## only keep foraging trips that (1) took place within a single day or (2) if the trip covered more than one day, only trips where the day after the start date of the trip is not missing (because the bird went outside the study area for example, or because it included durations of >60 minutes): 
 gps.breeding.data.behav$freq=1
 complete_birdyeardays <- aggregate(freq~birdID+yday_CEST+year+breeding.phase+breeding.phase.nr+sex, gps.breeding.data.behav, sum)
-table(complete_birdyeardays$freq)
 complete_birdyeardays <- complete_birdyeardays[order(complete_birdyeardays$year, complete_birdyeardays$birdID, complete_birdyeardays$yday_CEST),]
 complete_birdyeardays$next.day.missing <- 0
 for (i in 2:dim(complete_birdyeardays)[1]) if (complete_birdyeardays$yday_CEST[i]!=(complete_birdyeardays$yday_CEST[i-1]+1)) complete_birdyeardays$next.day.missing[i-1] <- 1

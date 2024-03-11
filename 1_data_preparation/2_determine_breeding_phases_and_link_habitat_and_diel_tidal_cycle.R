@@ -257,5 +257,3 @@ gps.breeding.data.behav = gps.breeding.data.behav[order(gps.breeding.data.behav$
 gps.breeding.data.behav <- na.omit(gps.breeding.data.behav[,c('birdID','year','date_time_CEST','longitude','latitude','habitat','breeding.phase','sex','behaviour','lat.nest','lon.nest','distance.to.nest','diel_rad','tidal_stage_rad')])
 
 write.csv(gps.breeding.data.behav, "data/gps.breeding.data.behav.csv", row.names=F)
-
-keep(gps.breeding.data.behav, bird.data, breeding.data, sure=T)

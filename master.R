@@ -9,6 +9,7 @@ packages <- c("RODBC", "move", "dplyr", "lubridate", "devtools", "plotrix", "sp"
 ipak(packages)
 
 set.seed(3) # to be able to reproduce random processes
+options(digits=10)
 
 # PROCESS DATA
 source("1_data_preparation/1_load_and_process_data_from_movebank.R")

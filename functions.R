@@ -213,8 +213,8 @@ make.table.from.dredge.output <- function(dredge_output) {
     table.output$model.name[i] <- model.formula
   }
   table.output$'-2logL' <- table.output$logLik * -2
-  table.output$'d-2LogL' <- table.output$'-2logL' - min(table.output$'-2logL')
-  table.output <- table.output[,c('model.name','df','-2logL','delta','weight')]
+  table.output$'d-2logL' <- table.output$'-2logL' - min(table.output$'-2logL')
+  table.output <- table.output[,c('model.name','df','d-2logL','delta','weight')]
   names(table.output)[c(2,4,5)] <- c('K','dAICc','Akaike.weight')
   table.output[,3:5] <- format(round(table.output[,3:5],2), trim=T)
   table.output
