@@ -213,20 +213,4 @@ References
 
 Lok T, van der Geest M, Bom RA, de Goeij P, Piersma T, Bouten W, 2023. Prey ingestion rates revealed by back-mounted accelerometers in Eurasian spoonbills. Animal Biotelemetry 11:5. https://doi.org/10.1186/s40317-022-00315-w. 
 
-Lok T, van der Geest M, de Goeij P, Rakhimberdiev E, Piersma T, 2024. Sex-specific nest attendance rhythm and foraging habitat use in a colony-breeding waterbird. Behavioral Ecology xx:xx. https://doi.org/xxx/xxx. 
-
-
-	
-
-
-
-
-
-
-
-
-
-  
-    
-
-  
+Lok T, van der Geest M, de Goeij P, Rakhimberdiev E, Piersma T, 2024. Sex-specific nest attendance rhythm and foraging habitat use in a colony-breeding waterbird. Behavioral Ecology 35:arae020. https://doi.org/10.1093/beheco/arae020. 

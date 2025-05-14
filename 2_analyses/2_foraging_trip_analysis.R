@@ -140,7 +140,7 @@ m_for.trip.dur.gamma  = glmer(trip.duration~breeding.phase*sex+(1|birdID)+(1|yea
 model.sel.for.trip.dur.gamma = dredge(m_for.trip.dur.gamma) 
 m.pars.for.trip.dur = get.models(model.sel.for.trip.dur.gamma,1)[[1]]
 summary(m.pars.for.trip.dur)
-emmeans.for.trip.dur <- emmeans(m.pars.for.trip.dur, pairwise~breeding.phase*sex, type='response')
+emmeans.for.trip.dur <- emmeans(m_for.trip.dur.gamma, pairwise~breeding.phase*sex, type='response') # pars model = full model
 emmeans.for.trip.dur # all pairwise comparisons are significant, except eggs M vs chicks M and eggs F vs eggs/chicks M). 
 dur.trips.pairs = as.data.frame(emmeans.for.trip.dur$contrasts)[c(2,5,1,6),]
 dur.trips.pairs$sign = ifelse(dur.trips.pairs$p.value<0.001, "***",

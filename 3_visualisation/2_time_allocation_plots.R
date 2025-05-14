@@ -58,6 +58,7 @@ duration_behaviour_bird_phase_year$prop_for_marine <- duration_behaviour_bird_ph
 
 ############## FIGURE 5 ###############
 postscript("output/Fig5.eps",width=10,height=8)
+# windows(10,8)
 layout(1:2)
 par(mar=c(1,1,0,0), oma=c(4,4,3,7))
 # PANEL A: proportion of time spent foraging ~ sex + breeding phase
@@ -87,7 +88,7 @@ text(1:5, ymin+(ymax-ymin)*0.9, c("ab","b","b","a","b"), col="lightcoral", adj=c
 text(1:5+0.3, ymin+(ymax-ymin)*0.9, c("c","b","c","b","a"), col="lightskyblue", adj=c(0.5,0))
 axis(1, at=1:5+0.15, labels=FALSE)
 axis(1, at=1:5+0.15, labels=c('pre-','incubation', 'chick-','post-', 'post-'), cex.axis=1, line=-0.5, tick=F)
-axis(1, at=1:5+0.15, labels=c('breeding','', 'rearing','breeding +', 'breeding -'), cex.axis=1, line=0.3, tick=F)
+axis(1, at=1:5+0.15, labels=c('breeding','','rearing','breeding +', 'breeding -'), cex.axis=1, line=0.3, tick=F)
 axis(2, at=seq(0,1,0.2), las=1)
 mtext("Marine foraging probability",2,3,cex=1.2)
 mtext("Breeding phase",1,3,cex=1.2)

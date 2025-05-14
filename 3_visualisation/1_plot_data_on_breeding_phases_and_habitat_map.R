@@ -22,12 +22,18 @@ nest.locations.used <- na.omit(unique(gps.breeding.data.behav[,c('birdID','year'
 ############# FIGURE 1 ######################
 postscript("output/Fig1.eps",width=11,height=6)
 # windows(11,6)
-par(oma=c(0,0,1,11), mar=c(3,3,0,0))
+par(oma=c(0,0,1,14), mar=c(3,3,0,0))
 plot(schier_new84_sel, axes=TRUE, border=NA, col = ColHabitats[schier_new84_sel$HabitatNr], xlim=c(5.9,6.6), ylim=c(53.30,53.57))
 legend(6.66,53.56, habitat_types$HabitatsMapped, pch=22, pt.bg=habitat_types$ColHabitats, xpd=NA)
-DrawEllipse(x=mean(nest.locations.used$lon.nest), y=mean(nest.locations.used$lat.nest), radius.x=0.03, radius.y=0.007, rot=0.19, col=NA, border='red', lwd=2)
+DrawEllipse(x=mean(nest.locations.used$lon.nest), y=mean(nest.locations.used$lat.nest), radius.x=0.023, radius.y=0.007, rot=0.19, col=NA, border='red', lwd=2)
 rasterImage(map_NL, 6.65, 53.3, 6.8, 53.4, xpd=NA)
 polygon(c(6.745,6.767,6.767,6.745),c(53.385,53.385,53.395,53.395), xpd=NA, col=NA, border='blue')
+# add scale:
+lines(c(6.48, 6.56), c(53.32, 53.32), lwd=2)
+lines(c(6.48, 6.48), c(53.318, 53.322), lwd=2)
+lines(c(6.56, 6.56), c(53.318, 53.322), lwd=2)
+text(6.52,53.327,"5 km", cex=1.3)
+# end of adding scale
 dev.off()
 ############ END FIGURE 1 ##################
 
@@ -62,21 +68,22 @@ birdyears = birdyears[order(birdyears$sex, birdyears$birdID, birdyears$year),]
 breeding.phase.cols = c('grey','white','darkorange','dodgerblue','darkolivegreen3','red')
 
 ################# FIGURE S1 ##########################
-pdf("output/FigS1.pdf", height=6, width=8)
-par(mar=c(1,1,0.5,0), oma=c(2.5,4.5,0.5,10))
+pdf("output/FigS1.pdf", height=8, width=8)
+#windows(8,8)
+par(mar=c(1,1,0.5,0), oma=c(2.5,6,0.5,8))
 plot(N_yday_birdID_year_sel$yday_CEST, 1:dim(N_yday_birdID_year_sel)[1], ylim=c(1,dim(birdyears)[1]), type='n', xlab='', ylab='', xaxt='n', yaxt='n')
 axis(1, at=c(91,121,152,182,213,244,274), labels=F)
 axis(1, at=c(91,121,152,182,213,244,274)+15, line=-1, labels=c('Apr','May','Jun','Jul','Aug','Sep','Oct'), cex.axis=0.8, tick=F)
-axis(2, dim(birdyears)[1]:1, paste(birdyears$sex, birdyears$birdID, birdyears$year), las=1, cex.axis=0.5)
-legend(250,10,c('pre-breeding','incubation', 'chick-rearing','post-breeding +', 'post-breeding -'), pch=19, col=breeding.phase.cols[c(1,3:6)],bty='n', xpd=NA, cex=1)
+axis(2, dim(birdyears)[1]:1, paste(birdyears$sex, birdyears$birdID, birdyears$year), las=1, cex.axis=0.7)
+legend(245,10,c('pre-breeding','incubation', 'chick-rearing','post-breeding +', 'post-breeding -'), pch=19, col=breeding.phase.cols[c(1,3:6)],bty='n', xpd=NA, cex=1)
 mtext('Day of the year', 1, 1, cex=1, outer=T)
-mtext('Birdyear', 2, 3, cex=1, outer=T)
+mtext('Birdyear', 2, 4, cex=1, outer=T)
 for (i in 1:dim(birdyears)[1]) {
   birdline=dim(birdyears)[1]+1-i
   bird = birdyears$birdID[i]
   year = birdyears$year[i]
   df = N_yday_birdID_year_sel[N_yday_birdID_year_sel$birdID==bird&N_yday_birdID_year_sel$year==year,]
-  for (j in unique(df$breeding.phase.nr)) points(df$yday_CEST[df$breeding.phase.nr==j], rep(birdline, dim(df[df$breeding.phase.nr==j,])[1]), col=breeding.phase.cols[j], pch=15, cex=0.5)
+  for (j in unique(df$breeding.phase.nr)) points(df$yday_CEST[df$breeding.phase.nr==j], rep(birdline, dim(df[df$breeding.phase.nr==j,])[1]), col=breeding.phase.cols[j], pch=15, cex=0.8)
 }
 dev.off()
 ############# END FIGURE S1 ########################
@@ -122,11 +129,12 @@ names(sex.labs) = c("F","M")
 
 p <- OpenStreetMap::autoplot.OpenStreetMap(schiermap) + 
   geom_tile(data = foraging.data.per.coordrnd.merc, aes( x = x, y = y, fill=foraging)) +
+  scale_fill_gradient(low = "yellow", high = "red", trans="log", labels=c(1,7,55,403), name="density") + 
+  facet_grid(breeding.phase2~sex, labeller = labeller(breeding.phase2 = phase.labs, sex = sex.labs)) +
   theme(legend.position = c(1.15,0.15),
         axis.text = element_blank(),
         axis.ticks = element_blank(),
-        axis.title = element_blank()) + 
-  scale_fill_gradient(low = "yellow", high = "red", trans="log", labels=c(1,7,55,403), name="density") + 
-  facet_grid(breeding.phase2~sex, labeller = labeller(breeding.phase2 = phase.labs, sex = sex.labs))
-p
+        axis.title = element_blank(),
+        strip.text.y.right = element_text(angle=90, vjust=1)) 
+
 ggsave(file=paste("output/FigS4_foraging.maps.pdf",sep=""), plot = p, width=15, height=14, units="cm")
